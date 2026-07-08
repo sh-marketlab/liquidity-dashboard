@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美元流動性儀表板 · 供給側 × 需求側</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0B1220; --panel:#111B2D; --panel2:#0E1626; --line:#1E2A40;
+    --ink:#D9E2EF; --muted:#7E8CA3; --faint:#4A5670;
+    --teal:#3FB8AF; --amber:#E0A458; --red:#E2606B; --blue:#5B8DD9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    font-size:14px;line-height:1.55;padding:28px 4vw 60px}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
+
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;margin-bottom:6px}
+  h1{font-size:20px;font-weight:700;letter-spacing:.04em}
+  h1 .mono{color:var(--teal);font-weight:600}
+  #updated{color:var(--muted);font-size:12px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:22px}
+
+  /* 訊號摘要列 */
+  #signals{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:26px}
+  .sig{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;border-left:3px solid var(--faint)}
+  .sig .k{font-size:11px;color:var(--muted);letter-spacing:.08em;margin-bottom:4px}
+  .sig .v{font-size:15px;font-weight:600}
+  .sig .d{font-size:11px;color:var(--muted);margin-top:2px}
+  .ok{border-left-color:var(--teal)} .ok .v{color:var(--teal)}
+  .watch{border-left-color:var(--amber)} .watch .v{color:var(--amber)}
+  .alert{border-left-color:var(--red)} .alert .v{color:var(--red)}
+
+  /* 水位計 (signature) */
+  #gauge-wrap{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px 20px;margin-bottom:26px}
+  #gauge-wrap .k{font-size:11px;color:var(--muted);letter-spacing:.08em;margin-bottom:10px}
+  #gauge{position:relative;height:26px;border-radius:13px;background:linear-gradient(90deg,#3A2530 0%,#2A2A33 35%,#15303B 70%,#123A3C 100%);border:1px solid var(--line)}
+  #gauge .tick{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--red);opacity:.85}
+  #gauge .tick span{position:absolute;top:32px;left:-24px;font-size:10px;color:var(--red);white-space:nowrap}
+  #gauge .needle{position:absolute;top:-9px;bottom:-9px;width:3px;background:var(--ink);border-radius:2px;box-shadow:0 0 8px rgba(217,226,239,.7)}
+  #gauge .needle span{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:600;white-space:nowrap}
+  #gauge .range{position:absolute;top:38px;font-size:10px;color:var(--faint)}
+
+  section h2{font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:500;
+    border-bottom:1px solid var(--line);padding-bottom:8px;margin:30px 0 16px}
+  section h2 b{color:var(--ink)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+  .card h3{font-size:12px;font-weight:500;color:var(--ink);margin-bottom:2px}
+  .card .note{font-size:11px;color:var(--muted);margin-bottom:10px}
+  .chart-box{position:relative;height:210px}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{color:var(--muted);font-weight:500;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);letter-spacing:.05em}
+  td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--panel2)}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+  .flag{display:inline-block;min-width:52px;text-align:center;border-radius:4px;padding:1px 6px;font-size:11px}
+  .f-ok{background:rgba(63,184,175,.14);color:var(--teal)}
+  .f-watch{background:rgba(224,164,88,.16);color:var(--amber)}
+  .f-alert{background:rgba(226,96,107,.16);color:var(--red)}
+
+  #setup{display:none;background:var(--panel);border:1px dashed var(--amber);border-radius:8px;padding:20px;margin-top:20px;color:var(--amber);font-size:13px}
+  footer{margin-top:36px;color:var(--faint);font-size:11px}
+  @media (max-width:640px){ .chart-box{height:180px} body{padding:20px 4vw 50px} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>美元流動性儀表板 <span class="mono">SUPPLY × DEMAND</span></h1>
+  <span id="updated" class="mono">載入中…</span>
+</header>
+<p class="sub">每週四 H.4.1 後更新供給側；標售結果隨每場拍賣更新。判讀順序：訊號列 → 水位計 → 供給側斜率 → 需求側買家。</p>
+
+<div id="signals"></div>
+
+<div id="gauge-wrap">
+  <div class="k">淨流動性水位計 NET LIQUIDITY = WALCL − TGA − RRP</div>
+  <div id="gauge"></div>
+</div>
+
+<section>
+  <h2><b>供給側</b> · 錢的總量與壓力 SUPPLY</h2>
+  <div class="grid">
+    <div class="card"><h3>淨流動性（兆美元）</h3><div class="note">紅虛線 = 5.2兆歷史平台下緣（經驗警戒位）</div><div class="chart-box"><canvas id="c_netliq"></canvas></div></div>
+    <div class="card"><h3>SOFR − IORB 利差（%）</h3><div class="note">灰點=日頻雜訊 · 實線=週均中樞 · 中樞站上0=缺水</div><div class="chart-box"><canvas id="c_spread"></canvas></div></div>
+    <div class="card"><h3>銀行準備金（兆美元）</h3><div class="note">安全邊際 · 跌破約3兆進入摩擦區</div><div class="chart-box"><canvas id="c_reserves"></canvas></div></div>
+    <div class="card"><h3>SRF 使用量（十億美元）</h3><div class="note">缺水火警器 · 平常趴0，持續出現數十億=有人被迫向Fed典當</div><div class="chart-box"><canvas id="c_srf"></canvas></div></div>
+  </div>
+</section>
+
+<section>
+  <h2><b>需求側</b> · 誰在接美國國債 DEMAND</h2>
+  <div class="grid">
+    <div class="card"><h3>情境1 · Fed持有國債 4週變化（十億）</h3><div class="note">正=擴表買入 · 負=QT · TREAST</div><div class="chart-box"><canvas id="c_fed"></canvas></div></div>
+    <div class="card"><h3>情境5 · 海外官方代管持有（兆美元）</h3><div class="note">Fed代管帳戶 WMTSECL1 · 連續下滑=官方退場</div><div class="chart-box"><canvas id="c_custody"></canvas></div></div>
+    <div class="card"><h3>情境3 · 商業銀行持有公債＋機構債（兆）</h3><div class="note">搭配放貸環境判讀 · H.8</div><div class="chart-box"><canvas id="c_bank"></canvas></div></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3>情境4／6 · 附息債標售體檢（近30場 Notes / Bonds）</h3>
+    <div class="note">Dealer% = 一級交易商被迫吃下比例：&lt;15% 正常 · 15–20% 留意 · &gt;20% 警報（真實需求缺席）</div>
+    <div style="overflow-x:auto"><table id="auction-table" class="mono">
+      <thead><tr><th>日期</th><th>券種</th><th>BTC</th><th>得標利率%</th><th>間接%</th><th>直接%</th><th>Dealer%</th><th>判定</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+<div id="setup">
+  尚未載入到 data.json —— 請先完成 README 的三步設定（FRED API key → GitHub Secret → 啟用 Actions），
+  或在本機執行 <span class="mono">python fetch_data.py</span> 後重新整理。
+</div>
+
+<footer>資料來源：FRED / U.S. Treasury FiscalData。情境2（退休基金）為季頻Z.1、情境7（基差交易）請沿用你的CFTC COT槓桿基金淨空單分析——低頻項目不納入自動更新。</footer>
+
+<script>
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const COLORS = {teal:css('--teal'),amber:css('--amber'),red:css('--red'),blue:css('--blue'),muted:css('--muted'),faint:css('--faint'),line:css('--line'),ink:css('--ink')};
+Chart.defaults.color = COLORS.muted;
+Chart.defaults.borderColor = COLORS.line;
+Chart.defaults.font.family = "'IBM Plex Mono',monospace";
+Chart.defaults.font.size = 10;
+
+// 單位自動正規化 → 兆美元
+function toT(v){ if(v==null) return null; const a=Math.abs(v);
+  if(a>1e5) return v/1e6;      // Millions → T
+  if(a>1e2) return v/1e3;      // Billions → T
+  return v; }                   // 已是 Trillions
+function toB(v){ return toT(v)*1000; }
+
+function line(id, rows, opts={}){
+  const el=document.getElementById(id); if(!el||!rows.length) return;
+  const ds=[{data:rows.map(r=>({x:r[0],y:r[1]})),borderColor:opts.color||COLORS.teal,
+    borderWidth:1.6,pointRadius:0,tension:.15,fill:opts.fill?{target:'origin'}:false,
+    backgroundColor:opts.fill?'rgba(63,184,175,.08)':undefined}];
+  if(opts.extra) ds.push(opts.extra);
+  new Chart(el,{type:opts.type||'line',data:{datasets:ds},options:{
+    responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{type:'category',ticks:{maxTicksLimit:6,callback:function(v){const l=this.getLabelForValue(v);return l?l.slice(0,7):'';}},grid:{display:false}},
+            y:{ticks:{maxTicksLimit:6},grid:{color:COLORS.line}}},
+    ...(opts.chartOpts||{})
+  },plugins:opts.hline!=null?[{id:'hl',afterDraw(c){
+    const y=c.scales.y.getPixelForValue(opts.hline);
+    if(y<c.chartArea.top||y>c.chartArea.bottom)return;
+    const g=c.ctx;g.save();g.strokeStyle=COLORS.red;g.setLineDash([5,4]);g.lineWidth=1;
+    g.beginPath();g.moveTo(c.chartArea.left,y);g.lineTo(c.chartArea.right,y);g.stroke();g.restore();
+  }}]:[]});
+}
+
+function sigCard(k,v,d,cls){return `<div class="sig ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;}
+
+function pctChange(rows,weeksBack){
+  if(rows.length<weeksBack+1) return null;
+  const a=rows[rows.length-1][1], b=rows[rows.length-1-weeksBack][1];
+  return (a-b)/Math.abs(b)*100;
+}
+
+fetch('data.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(D=>{
+  document.getElementById('updated').textContent = '更新：'+D.updated;
+  const S=D.supply, M=D.demand;
+
+  // ---- 換算 ----
+  const netliq = S.net_liquidity.map(r=>[r[0],toT(r[1])]);
+  const reserves = S.reserves.map(r=>[r[0],toT(r[1])]);
+  const custody = (M.foreign_custody||[]).map(r=>[r[0],toT(r[1])]);
+  const bank = (M.bank_holdings||[]).map(r=>[r[0],toT(r[1])]);
+  const fed = (M.fed_treast||[]).map(r=>[r[0],toB(r[1])]);
+  const fedChg=[]; for(let i=4;i<fed.length;i++) fedChg.push([fed[i][0],+(fed[i][1]-fed[i-4][1]).toFixed(1)]);
+  const srf=(S.srf||[]).map(r=>[r[0],Math.abs(r[1])>1e3?r[1]/1e3:r[1]]); // →Billions
+
+  // ---- 訊號計算 ----
+  const sigs=[];
+  const slope8=pctChange(netliq,8);
+  if(slope8!=null){const cls=slope8>0.5?'ok':slope8<-0.5?(slope8<-2?'alert':'watch'):'ok';
+    sigs.push(sigCard('淨流動性 8週斜率',(slope8>0?'+':'')+slope8.toFixed(1)+'%',slope8>0.5?'環境順風':slope8<-0.5?'環境轉逆，開圖A歸因':'走平中性',cls));}
+  const sw=S.spread_weekly||[];
+  if(sw.length>=4){const c=sw.slice(-4).reduce((s,r)=>s+r[1],0)/4;
+    const cls=c>0?'alert':c>-0.02?'watch':'ok';
+    sigs.push(sigCard('SOFR−IORB 4週中樞',(c*100).toFixed(1)+' bp',c>0?'緊繃：預期Fed技術性補水':c>-0.02?'適足偏緊':'充裕',cls));}
+  if(reserves.length){const r=reserves[reserves.length-1][1];
+    sigs.push(sigCard('銀行準備金',r.toFixed(2)+' 兆',r<3?'低於3兆摩擦區':'高於3兆安全邊際',r<2.9?'alert':r<3.05?'watch':'ok'));}
+  if(srf.length){const mx=Math.max(...srf.slice(-10).map(r=>r[1]));
+    sigs.push(sigCard('SRF 火警器',mx.toFixed(1)+' B',mx>5?'有機構向Fed典當中':'近10日無異常',mx>20?'alert':mx>5?'watch':'ok'));}
+  const au=(D.auctions||[]).filter(a=>a.dealer_pct!=null).slice(0,3);
+  if(au.length){const avg=au.reduce((s,a)=>s+a.dealer_pct,0)/au.length;
+    sigs.push(sigCard('近3場標售 Dealer均值',avg.toFixed(1)+'%',avg>20?'需求缺席警報':avg>15?'需求偏弱留意':'需求正常',avg>20?'alert':avg>15?'watch':'ok'));}
+  if(custody.length>=9){const ch=pctChange(custody,8);
+    sigs.push(sigCard('海外官方 8週變化',(ch>0?'+':'')+ch.toFixed(1)+'%',ch<-1?'官方買盤退場中':'官方持有平穩',ch<-1?'watch':'ok'));}
+  document.getElementById('signals').innerHTML=sigs.join('');
+
+  // ---- 水位計 ----
+  if(netliq.length){
+    const vals=netliq.map(r=>r[1]), cur=vals[vals.length-1];
+    const lo=Math.min(...vals.slice(-260)), hi=Math.max(...vals.slice(-260));
+    const pos=v=>((v-lo)/(hi-lo)*100).toFixed(1)+'%';
+    const g=document.getElementById('gauge');
+    g.innerHTML=`<div class="tick" style="left:${pos(5.2)}"><span>5.2兆警戒</span></div>
+      <div class="needle" style="left:${pos(cur)}"><span class="mono">${cur.toFixed(2)}兆</span></div>
+      <div class="range mono" style="left:0">${lo.toFixed(1)}</div>
+      <div class="range mono" style="right:0">${hi.toFixed(1)}</div>`;
+  }
+
+  // ---- 供給側圖 ----
+  line('c_netliq',netliq,{color:COLORS.teal,fill:true,hline:5.2});
+  line('c_spread',(S.spread_weekly||[]),{color:COLORS.amber,hline:0,
+    extra:{data:(S.spread_daily||[]).map(r=>({x:r[0],y:r[1]})),borderColor:'rgba(126,140,163,.35)',borderWidth:.8,pointRadius:0,tension:0}});
+  line('c_reserves',reserves,{color:COLORS.blue,hline:3});
+  line('c_srf',srf,{color:COLORS.red,type:'bar'});
+
+  // ---- 需求側圖 ----
+  const fedEl=document.getElementById('c_fed');
+  if(fedEl&&fedChg.length) new Chart(fedEl,{type:'bar',data:{datasets:[{data:fedChg.map(r=>({x:r[0],y:r[1]})),
+    backgroundColor:fedChg.map(r=>r[1]>=0?'rgba(63,184,175,.7)':'rgba(226,96,107,.7)')}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{maxTicksLimit:6,callback:function(v){const l=this.getLabelForValue(v);return l?l.slice(0,7):'';}},grid:{display:false}},y:{grid:{color:COLORS.line}}}}});
+  line('c_custody',custody,{color:COLORS.blue});
+  line('c_bank',bank,{color:COLORS.muted});
+
+  // ---- 標售表 ----
+  const tb=document.querySelector('#auction-table tbody');
+  tb.innerHTML=(D.auctions||[]).map(a=>{
+    const dp=a.dealer_pct;
+    const cls=dp==null?'':dp>20?'f-alert':dp>15?'f-watch':'f-ok';
+    const label=dp==null?'—':dp>20?'警報':dp>15?'留意':'正常';
+    return `<tr><td>${a.date||''}</td><td>${a.term||''} ${a.type||''}</td>
+      <td>${a.btc??'—'}</td><td>${a.high_yield??'—'}</td>
+      <td>${a.indirect_pct??'—'}</td><td>${a.direct_pct??'—'}</td><td>${dp??'—'}</td>
+      <td><span class="flag ${cls}">${label}</span></td></tr>`;
+  }).join('');
+}).catch(()=>{ document.getElementById('setup').style.display='block';
+  document.getElementById('updated').textContent='等待首次數據'; });
+</script>
+</body>
+</html>
