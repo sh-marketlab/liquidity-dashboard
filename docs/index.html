@@ -208,8 +208,8 @@ fetch('data.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(D=>{
 
   // ---- 供給側圖 ----
   line('c_netliq',netliq,{color:COLORS.teal,fill:true,hline:5.2});
-  line('c_spread',(S.spread_weekly||[]),{color:COLORS.amber,hline:0,
-    extra:{data:(S.spread_daily||[]).map(r=>({x:r[0],y:r[1]})),borderColor:'rgba(126,140,163,.35)',borderWidth:.8,pointRadius:0,tension:0}});
+  line('c_spread',(S.spread_daily||[]),{color:'rgba(126,140,163,.35)',hline:0,
+    extra:{data:(S.spread_weekly||[]).map(r=>({x:r[0],y:r[1]})),borderColor:COLORS.amber,borderWidth:1.8,pointRadius:0,tension:.15}});
   line('c_reserves',reserves,{color:COLORS.blue,hline:3});
   line('c_srf',srf,{color:COLORS.red,type:'bar'});
 
