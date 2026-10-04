@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>流動性循環儀表板</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#EEF1F4;--panel:#FFFFFF;--ink:#14202C;--mute:#5B6876;--rule:#D5DBE2;--grid:#E4E8ED;
+  --sp:#3A4654;--nq:#B5651D;--assets:#8A97A6;--net:#0B5FD0;--res:#1A9A8A;--hy:#C0304A;--curve:#4B4FB5;
+  --qe1:#17968A;--qe2:#D99A00;--qt1:#D8648A;--qt2:#A8213B;--qt3:#6A62B8;
+  --band:.10;--tip:#14202C;--tipink:#FFFFFF;--on:#FFFFFF;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F151C;--panel:#161E27;--ink:#E7ECF1;--mute:#9AA7B5;--rule:#2A3541;--grid:#222C37;
+  --sp:#D5DCE4;--nq:#F0A860;--assets:#7D8B9A;--net:#5AA2FF;--res:#3CC4B2;--hy:#FF6B84;--curve:#9A9DFF;
+  --qe1:#2FC0B1;--qe2:#F0B429;--qt1:#F08AAB;--qt2:#E0506B;--qt3:#958DE6;
+  --band:.13;--tip:#E7ECF1;--tipink:#0F151C;--on:#0F151C;
+}}
+:root[data-theme="dark"]{
+  --bg:#0F151C;--panel:#161E27;--ink:#E7ECF1;--mute:#9AA7B5;--rule:#2A3541;--grid:#222C37;
+  --sp:#D5DCE4;--nq:#F0A860;--assets:#7D8B9A;--net:#5AA2FF;--res:#3CC4B2;--hy:#FF6B84;--curve:#9A9DFF;
+  --qe1:#2FC0B1;--qe2:#F0B429;--qt1:#F08AAB;--qt2:#E0506B;--qt3:#958DE6;
+  --band:.13;--tip:#E7ECF1;--tipink:#0F151C;--on:#0F151C;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;font-size:15px;line-height:1.7;font-feature-settings:"tnum"}
+main{max-width:1300px;margin:0 auto;padding:28px 20px 56px}
+h1{font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;font-weight:700;font-size:clamp(22px,3.1vw,34px);line-height:1.3;margin:0 0 10px;letter-spacing:.01em}
+.lede{max-width:46em;margin:0 0 6px;color:var(--ink)}
+.now{color:var(--mute);font-size:13.5px;margin:0 0 18px}
+.now b{color:var(--ink);font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 18px}
+.tile{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:11px 14px 12px}
+.tile .k{font-size:12.5px;color:var(--mute)}
+.tile .v{font-size:22px;font-weight:700;line-height:1.35;white-space:nowrap}
+.tile .v small{font-size:13px;font-weight:500;color:var(--mute)}
+.tile .c{font-size:12.5px;color:var(--mute)}
+.tile .r{font-size:12.5px;font-weight:700;margin-top:3px}
+h2{font-family:"Noto Serif TC","Songti TC",serif;font-size:19px;font-weight:700;margin:34px 0 10px}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:6px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+#chartwrap{position:relative;padding:6px 4px 2px}
+#chart{display:block;width:100%;min-width:980px;height:auto;touch-action:pan-x pan-y}
+svg text{font-family:inherit;fill:var(--mute);font-size:12px}
+.axis{stroke:var(--rule);stroke-width:1}.grid{stroke:var(--grid);stroke-width:1}
+.ln{fill:none;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+.approx{stroke-dasharray:4 3;opacity:.75}
+.ptitle{fill:var(--ink);font-weight:700;font-size:12.5px}
+.endlab{font-weight:700;font-size:12px}
+.evline{stroke-width:1;stroke-dasharray:2 3;opacity:.7}
+.evnum{font-size:10.5px;font-weight:700;fill:var(--on);text-anchor:middle}
+.rib text{fill:var(--on);font-weight:700;font-size:12px;text-anchor:middle;pointer-events:none}
+.rib rect{cursor:pointer}
+.note{font-size:11px}
+#tip{position:absolute;pointer-events:none;background:var(--tip);color:var(--tipink);font-size:12.5px;line-height:1.55;padding:8px 10px;border-radius:5px;min-width:190px;display:none;z-index:3}
+#tip .d{font-weight:700}#tip .ph{opacity:.8;margin-bottom:3px}
+#tip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 16px 12px;border-top:1px solid var(--rule);font-size:13px;color:var(--mute)}
+.legend span{white-space:nowrap}.legend i{display:inline-block;width:18px;height:0;border-top:2.5px solid;vertical-align:middle;margin-right:6px}
+.legend i.dash{border-top-style:dashed}
+ol.events{columns:2 340px;column-gap:36px;margin:0;padding:14px 18px 14px 40px;font-size:14px}
+ol.events li{break-inside:avoid;margin-bottom:5px}ol.events time{font-weight:700;margin-right:6px}
+.rates{border-top:1px solid var(--rule);padding:12px 18px 14px;font-size:13.5px}.rates p{margin:0 0 6px}.rates b{white-space:nowrap}
+ol.events .k{font-size:12px;padding:0 6px;border-radius:3px;color:var(--on);margin-left:4px;white-space:nowrap}
+table{border-collapse:collapse;width:100%;min-width:1320px;font-size:13.5px;line-height:1.6}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--rule)}
+th{font-weight:700;color:var(--mute);font-size:12.5px;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tr.hit td{background:color-mix(in srgb,var(--net) 9%,transparent)}
+.chip{display:inline-block;color:var(--on);font-weight:700;font-size:12.5px;padding:1px 8px;border-radius:3px;white-space:nowrap}
+td.per{white-space:nowrap;color:var(--mute)}td.num{white-space:nowrap}
+td.num b{font-weight:700}
+.up{color:var(--res)}.dn{color:var(--hy)}
+ul.read{margin:0;padding:14px 18px 14px 36px;max-width:60em}ul.read li{margin-bottom:8px}
+.src{font-size:13px;color:var(--mute);padding:14px 18px;max-width:none}
+.src p{margin:0 0 8px;max-width:70em}.src b{color:var(--ink)}
+a{color:var(--net)}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){main{padding:18px 12px 40px}body{font-size:14.5px}}
+</style>
+</head>
+<body>
+<main>
+<h1>流動性循環儀表板：Fed 資產負債表、政策利率、股市與信用</h1>
+<p class="lede">每天看三件事：流動性是在流入、持平還是流失；利率和資產負債表是不是同方向；股市和信用利差有沒有分歧。</p>
+<p class="now" id="now"></p>
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <div class="scroll"><div id="chartwrap"><svg id="chart" role="img" aria-label="2016 年 10 月至 2026 年 10 月：Fed 總資產、淨流動性、銀行準備金、高收益債利差與 10 年減 2 年公債利差，疊上 QE/QT 階段與政策宣布日"></svg><div id="tip"></div></div></div>
+  <div class="legend">
+    <span><i style="border-color:var(--assets)"></i>Fed 總資產 WALCL</span>
+    <span><i style="border-color:var(--net)"></i>淨流動性＝總資產 − TGA − RRP</span>
+    <span><i style="border-color:var(--res)"></i>銀行準備金</span>
+    <span><i style="border-color:var(--sp)"></i>S&amp;P 500</span>
+    <span><i style="border-color:var(--nq)"></i>Nasdaq 綜合</span>
+    <span><i style="border-color:var(--hy)"></i>高收益債利差 HY OAS</span>
+    <span><i style="border-color:var(--curve)"></i>10Y−2Y</span>
+    <span><i class="dash" style="border-color:var(--hy)"></i>虛線＝HY 利差 2023-10 以前為概略重建</span>
+    <span>▲▼＝升息／降息日</span>
+    <span>圓圈數字＝資產負債表宣布日（見下方）</span>
+  </div>
+</div>
+
+<h2>Fed 正式宣布的時間點</h2>
+<div class="card"><ol class="events" id="events"></ol><div class="rates" id="rates"></div></div>
+
+<h2>各階段：406 文章的說法，對上實際數據</h2>
+<div class="card scroll"><table id="phases"><thead><tr>
+<th>階段</th><th>期間</th><th>市場狀態（406）</th><th>有錢人的布局（406）</th><th>淨流動性（兆美元）</th><th>S&amp;P 500</th><th>Nasdaq</th><th>政策利率上限</th><th>HY 利差區間</th><th>10Y−2Y 區間</th><th>數據對照</th>
+</tr></thead><tbody></tbody></table></div>
+
+<h2>讀圖重點（2026-10-04 整理，不會自動更新）</h2>
+<div class="card"><ul class="read">
+<li><b>流動性轉折與正式宣布的先後並不固定。</b>2021 年淨流動性 11 月下旬見頂（6.78 兆），落在 Taper 宣布後三週、QT 宣布前五個月。2019-09 落底那週發生附買回利率飆升，Fed 三週後才宣布買國庫券。2025-10-29 淨流動性觸及區間低點 5.24 兆，Fed 同一天宣布結束 QT。2017 年則是 QT1 在 9 月宣布，淨流動性 11 月才見頂。</li>
+<li><b>政策在 QT，不等於淨流動性在下降。</b>2022-06 到 2025-11 總資產從 8.9 兆縮到 6.5 兆，但逆回購（RRP）從 2023-04 的 2.68 兆流出到約 0.3 兆，把缺口補上。文章「QT 中期資產崩跌」的劇本只在 2022 年發生。</li>
+<li><b>股市和淨流動性的關聯不穩定。</b>兩者 13 週變動量的同期相關係數接近 0；讓淨流動性領先 8–13 週，相關係數約 0.35（2020–2022 約 0.5）。淨流動性 13 週內減少超過 0.3 兆的 37 週裡，S&amp;P 同期上漲的比例只有 40%，其餘時候約 72–86%。但 2023-11 到 2025-11 淨流動性略降，S&amp;P 漲了 62%。</li>
+<li><b>利率和資產負債表經常不同步。</b>上一輪是升息七週後就宣布縮表（2022-03-16 → 05-04）；但 2024-09 開始降息時縮表仍在進行，一邊降息一邊縮表持續了 14 個多月，到 2025-12 才停。現在則是反過來：2026-09 升息，同時保留買進國庫券的授權。只用升降息判斷 QE／QT 會看錯這兩段。</li>
+<li><b>階段切分是事後標籤。</b>起訖日是我依政策宣布與數據轉折所做的判斷，不是文章給的；文章描述的「有錢人布局」是作者的說法，圖上沒有任何數據可以驗證誰在何時買賣。</li>
+<li><b>現在：升息了，但還沒縮表。</b>8/28 Jackson Hole 的緊縮發言加上 9/16 升息，符合文章對「QT 初期」的描述（利率上升、緊縮發言），可是 Fed 沒有宣布縮表，總資產維持在 6.74 兆，淨流動性仍在三年區間內。信用市場反應慢了一個月：HY 利差 8/28 還在 2.60 的低點，9 月下旬才在 7 個交易日內由 2.68 升到 3.24，仍屬歷史偏低。</li>
+</ul></div>
+
+<h2>資料來源與可信度</h2>
+<div class="card src">
+<p><b>自動更新：</b>fetch_cycle.py 每個交易日由 GitHub Actions 執行，從 FRED API 抓 WALCL、WLRRAL、WDTGAL、WRBWFRBL、T10Y2Y、BAMLH0A0HYM2、SP500、NASDAQCOM、DFEDTARU，與既有資料合併後寫入 cycle_data.json。淨流動性＝WALCL − WDTGAL − WLRRAL。</p>
+<p><b>升降息：</b>由 DFEDTARU 的數值變動自動推出，標在決議日（生效日前一天）。</p>
+<p><b>人工維護：</b>階段切分、資產負債表宣布日與「數據對照」文字在 cycle_config.json。階段不會自動判斷；上方「目前階段」顯示的是設定檔最後一段。</p>
+<p><b>HY 利差虛線段：</b>2023-10 以前為概略重建，誤差可能到 ±0.3 個百分點。FRED 對這條序列只提供近三年，之後的歷史由本儀表板自行累積。</p>
+<p><b>狀態格的判讀規則：</b>淨流動性 13 週變化小於 −0.3 兆為「快速流失」、−0.3 至 −0.1 兆為「流出」、±0.1 兆內為「持平」；股市與信用的「分歧」定義為 S&amp;P 13 週上漲而 HY 利差同期擴大超過 30bp（或相反）。這些門檻來自 2016-10 至 2026-09 的回測，是描述而非預測。此頁不是投資建議。</p>
+
+</main>
+<script>
+(async function(){
+const S=await (await fetch('cycle_data.json?t='+Date.now(),{cache:'no-store'})).json();
+const T=d=>Date.parse(d+'T00:00:00Z');
+const LASTISO=[S.ty[S.ty.length-1][0],S.bs[S.bs.length-1][0],S.sp[S.sp.length-1][0]].sort().pop();
+const ENDISO=new Date(T(LASTISO)+18*864e5).toISOString().slice(0,10);
+const STG={
+ qe1:{name:'QE 初期',c:'--qe1',mkt:'景氣放緩、政策寬鬆',act:'分批買進風險資產'},
+ qe2:{name:'QE 後期',c:'--qe2',mkt:'市場過熱、貪婪擴大',act:'現金化、獲利了結'},
+ qt1:{name:'QT 初期',c:'--qt1',mkt:'利率上升、緊縮發言',act:'轉向防禦型資產；提高現金、美元、國債；降槓桿'},
+ qt2:{name:'QT 中期',c:'--qt2',mkt:'流動性收縮、資產修正',act:'持有現金、掌握機會；更新優質標的名單、檢視折價資產'},
+ qt3:{name:'QT 後期',c:'--qt3',mkt:'景氣放緩、出現政策轉向跡象',act:'低價累積部位、準備下一輪 QE'}
+};
+const PH=S.phases.map(p=>({...p,b:p.b||ENDISO,open:!p.b}));
+const EV=S.events;
+const FF0=S.ff0,FF=S.ff.map(r=>[T(r[0]),r[1],r[0]]);
+const rateAt=t=>{let v=FF0;for(const r of FF){if(r[0]<=t)v=r[1];else break}return v};
+const rng2=u=>(u-.25).toFixed(2)+'–'+u.toFixed(2)+'%';
+const EK={T:['緊縮','--qt2'],S:['放慢／結束緊縮','--qt3'],E:['擴表','--qe1'],R:['升息','--qt1'],K:['緊縮發言','--qt1']};
+
+// ---------- series ----------
+const bs=S.bs.map(r=>[T(r[0]),r[1],r[2],r[3],r[4],r[5]]);
+const hyA=S.hy_approx.filter(r=>r[0]<S.hy[0][0]).map(r=>[T(r[0]),r[1],r[1],r[1]]), hyD=S.hy.map(r=>[T(r[0]),r[1],r[1],r[1]]);
+const tyA=[], tyD=S.ty.map(r=>[T(r[0]),r[1],r[1],r[1]]);
+const hyAll=hyA.concat(hyD), tyAll=tyA.concat(tyD);
+const spD=S.sp.map(r=>[T(r[0]),r[1]]), nqD=S.nq.map(r=>[T(r[0]),r[1]]);
+const ix=(()=>{const out=[];let i=0,j=0;const days=bs.map(r=>r[0]);for(let t=bs[bs.length-1][0]+7*864e5;t<=spD[spD.length-1][0];t+=7*864e5)days.push(t);days.push(spD[spD.length-1][0]);
+ for(const t of days){while(i+1<spD.length&&spD[i+1][0]<=t)i++;while(j+1<nqD.length&&nqD[j+1][0]<=t)j++;if(spD[i][0]<=t&&nqD[j][0]<=t)out.push([t,spD[i][1],nqD[j][1]]);}
+ const a=out[0];return out.map(r=>[r[0],r[1],r[2],Math.log(r[1]/a[1]*100),Math.log(r[2]/a[2]*100)]);})();
+
+// ---------- geometry ----------
+const W=1240,H=1048,L=58,R=1160,X0=T('2016-10-01'),X1=T(ENDISO);
+const x=t=>L+(t-X0)/(X1-X0)*(R-L);
+const P={A:{y0:92,y1:392,lo:1,hi:9.6},I:{y0:424,y1:544,lo:Math.log(88),hi:Math.log(640)},R:{y0:576,y1:676,lo:0,hi:6.6},B:{y0:708,y1:856,lo:2,hi:11.6},C:{y0:888,y1:1012,lo:-1.3,hi:1.7}};
+const y=(p,v)=>p.y1-(v-p.lo)/(p.hi-p.lo)*(p.y1-p.y0);
+const path=(p,pts,i)=>pts.map((r,k)=>(k?'L':'M')+x(r[0]).toFixed(1)+' '+y(p,r[i]).toFixed(1)).join('');
+const cv=n=>`var(${n})`;
+let g='';
+// phase bands + ribbon
+PH.forEach((ph,i)=>{const st=STG[ph.s],xa=x(T(ph.a)),xb=x(T(ph.b));
+ g+=`<rect x="${xa}" y="${P.A.y0}" width="${xb-xa}" height="${P.C.y1-P.A.y0}" fill="${cv(st.c)}" opacity="var(--band)"/>`;
+ g+=`<g class="rib" data-i="${i}"><rect x="${xa+1}" y="10" width="${xb-xa-2}" height="26" rx="3" fill="${cv(st.c)}"><title>${st.name}　${ph.a.slice(0,7)} → ${ph.b.slice(0,7)}</title></rect><text x="${(xa+xb)/2}" y="27.5">${xb-xa>44?(ph.label||st.name):''}</text></g>`;});
+// panels: grid, axes, titles
+const ticks={A:[2,4,6,8],I:[],R:[2,4,6],B:[3,5,7,9,11],C:[-1,0,1]};
+for(const k in P){const p=P[k];
+ ticks[k].forEach(v=>{g+=`<line class="${k=='C'&&v==0?'axis':'grid'}" x1="${L}" x2="${R}" y1="${y(p,v)}" y2="${y(p,v)}"/><text x="${L-8}" y="${y(p,v)+4}" text-anchor="end">${v}</text>`;});
+ g+=`<line class="axis" x1="${L}" x2="${R}" y1="${p.y1}" y2="${p.y1}"/>`;}
+g+=`<text class="ptitle" x="${L+8}" y="${P.A.y0+17}">Fed 資產負債表（兆美元）</text>`;
+g+=`<text class="ptitle" x="${L+8}" y="${P.B.y0+15}">高收益債利差 HY OAS（%）</text>`;
+g+=`<text class="ptitle" x="${L+8}" y="${P.C.y0+13}">10 年 − 2 年公債利差（百分點）</text>`;
+g+=`<text class="ptitle" x="${L+8}" y="${P.I.y0+15}">股價指數（2016-10-05＝100，對數刻度）</text>`;
+[100,200,400].forEach(v=>{const yy=y(P.I,Math.log(v));g+=`<line class="grid" x1="${L}" x2="${R}" y1="${yy}" y2="${yy}"/><text x="${L-8}" y="${yy+4}" text-anchor="end">${v}</text>`;});
+g+=`<path class="ln" style="stroke:var(--sp)" d="${path(P.I,ix,3)}"/><path class="ln" style="stroke:var(--nq)" d="${path(P.I,ix,4)}"/>`;
+{const e=ix[ix.length-1];g+=`<text class="endlab" x="${x(e[0])+6}" y="${y(P.I,e[3])+10}" style="fill:var(--sp)">標普 ${Math.round(e[1]).toLocaleString()}</text><text class="endlab" x="${x(e[0])+6}" y="${y(P.I,e[4])+2}" style="fill:var(--nq)">納指 ${Math.round(e[2]).toLocaleString()}</text>`;}
+g+=`<text class="ptitle" x="${L+8}" y="${P.R.y0+13}">聯邦基金利率目標上限（%）　▲ 升息　▼ 降息</text>`;
+{let d=`M${x(X0)} ${y(P.R,FF0)}`,prev=FF0,mk='';const tEnd=tyD[tyD.length-1][0];
+ FF.forEach(r=>{const xx=x(r[0]),yy=y(P.R,r[1]),up=r[1]>prev,c=cv(up?'--qt2':'--qe1'),bp=Math.round(Math.abs(r[1]-prev)*100);
+  d+=`H${xx.toFixed(1)}V${yy.toFixed(1)}`;
+  mk+=`<path d="${up?`M${xx-4.5} ${yy-4}L${xx+4.5} ${yy-4}L${xx} ${yy-12}Z`:`M${xx-4.5} ${yy+4}L${xx+4.5} ${yy+4}L${xx} ${yy+12}Z`}" fill="${c}"><title>${r[2]}　${up?'升':'降'}息 ${bp}bp → ${rng2(r[1])}</title></path>`;prev=r[1];});
+ d+=`H${x(tEnd)}`;
+ g+=`<path class="ln" style="stroke:var(--ink)" stroke-width="1.6" stroke-linejoin="miter" d="${d}"/>${mk}<text class="endlab" x="${x(tEnd)+6}" y="${y(P.R,prev)+4}" style="fill:var(--ink)">${rng2(prev)}</text>`;}
+for(let yr=2017;yr<=new Date(X1).getUTCFullYear();yr++){const xx=x(T(yr+'-01-01'));g+=`<line class="grid" x1="${xx}" x2="${xx}" y1="${P.A.y0}" y2="${P.C.y1}"/><text x="${xx}" y="${P.C.y1+18}" text-anchor="middle">${yr}</text>`;}
+// events
+let lastx=-99,row=0;
+EV.forEach((e,i)=>{const xx=x(T(e[0])),c=cv(EK[e[2]][1]);row=(xx-lastx<19)?(row?0:1):0;lastx=xx;const cy=52+row*19;
+ g+=`<line class="evline" x1="${xx}" x2="${xx}" y1="${cy+8}" y2="${P.C.y1}" stroke="${c}"/><circle cx="${xx}" cy="${cy}" r="8.5" fill="${c}"><title>${e[0]}　${e[1]}</title></circle><text class="evnum" x="${xx}" y="${cy+3.8}">${i+1}</text>`;});
+// inversion shading
+g+=`<clipPath id="neg"><rect x="${L}" y="${y(P.C,0)}" width="${R-L}" height="${P.C.y1-y(P.C,0)}"/></clipPath>`;
+g+=`<path clip-path="url(#neg)" fill="${cv('--hy')}" opacity=".28" d="M${x(tyAll[0][0])} ${y(P.C,0)}${path(P.C,tyAll,1).replace(/^M/,'L')}L${x(tyAll[tyAll.length-1][0])} ${y(P.C,0)}Z"/>`;
+g+=`<text class="note" x="${x(T('2023-08-01'))}" y="${P.C.y1-6}" text-anchor="middle" style="fill:var(--hy);font-weight:700">倒掛：2022-07-06 → 2024-09-05，約 26 個月</text>`;
+g+=`<text class="note" x="${x(T('2019-08-27'))}" y="${y(P.C,-.22)}" text-anchor="middle" style="fill:var(--hy)">2019-08 短暫倒掛</text>`;
+// lines
+g+=`<path class="ln" stroke="${cv('--assets')}" d="${path(P.A,bs,1)}"/>`;
+g+=`<path class="ln" stroke="${cv('--res')}" stroke-width="1.4" d="${path(P.A,bs,3)}"/>`;
+g+=`<path class="ln" stroke="${cv('--net')}" stroke-width="2.4" d="${path(P.A,bs,2)}"/>`;
+g+=`<path class="ln approx" stroke="${cv('--hy')}" d="${path(P.B,hyA.concat([hyD[0]]),1)}"/><path class="ln" stroke="${cv('--hy')}" d="${path(P.B,hyD,1)}"/>`;
+g+=`<path class="ln approx" stroke="${cv('--curve')}" d="${path(P.C,tyA.concat([tyD[0]]),1)}"/><path class="ln" stroke="${cv('--curve')}" d="${path(P.C,tyD,1)}"/>`;
+// source boundary notes
+// end labels
+const last=bs[bs.length-1],xe=x(last[0])+6;
+[[1,'--assets','總資產'],[2,'--net','淨流動性'],[3,'--res','準備金']].forEach(([i,c,n])=>{g+=`<text class="endlab" x="${xe}" y="${y(P.A,last[i])+4}" style="fill:${cv(c)}">${n} ${last[i].toFixed(2)}</text>`;});
+const hl=hyD[hyD.length-1],tl=tyD[tyD.length-1];
+g+=`<text class="endlab" x="${x(hl[0])+6}" y="${y(P.B,hl[1])+4}" style="fill:${cv('--hy')}">${hl[1].toFixed(2)}</text>`;
+g+=`<text class="endlab" x="${x(tl[0])+6}" y="${y(P.C,tl[1])+4}" style="fill:${cv('--curve')}">${tl[1].toFixed(2)}</text>`;
+// peak labels
+[['2020-03-23',10.87,'10.87（2020-03-23）',8],['2025-04-07',4.61,'4.61',0],['2022-07-05',5.99,'5.99',0],['2019-01-03',5.44,'5.44',0]].forEach(([d,v,t,dx])=>{g+=`<text class="note" x="${x(T(d))+dx}" y="${y(P.B,v)-5}" text-anchor="${dx?'start':'middle'}" style="fill:${cv('--hy')};font-weight:700">${t}</text>`;});
+[['2021-11-24','淨流動性高點 6.78'],['2022-04-13','總資產高點 8.97']].forEach(([d,t])=>{const r=bs.find(r=>r[0]>=T(d));const v=t[0]=='淨'?r[2]:r[1];g+=`<circle cx="${x(r[0])}" cy="${y(P.A,v)}" r="3.2" fill="${cv(t[0]=='淨'?'--net':'--assets')}"/><text class="note" x="${x(r[0])}" y="${y(P.A,v)-8}" text-anchor="${t[0]=='淨'?'end':'middle'}" style="fill:var(--ink);font-weight:700">${t}</text>`;});
+g+=`<line id="cross" x1="0" x2="0" y1="${P.A.y0}" y2="${P.C.y1}" stroke="${cv('--ink')}" stroke-width="1" opacity="0"/>`;
+const svg=document.getElementById('chart');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML=g;
+
+// ---------- tooltip ----------
+const tip=document.getElementById('tip'),cross=document.getElementById('cross'),wrap=document.getElementById('chartwrap');
+const near=(arr,t)=>{let b=arr[0],bd=1e18;for(const r of arr){const d=Math.abs(r[0]-t);if(d<bd){bd=d;b=r}}return b};
+const iso=t=>new Date(t).toISOString().slice(0,10);
+function move(ev){const rc=svg.getBoundingClientRect(),vx=(ev.clientX-rc.left)/rc.width*W;
+ if(vx<L||vx>R){hide();return}
+ const t=X0+(vx-L)/(R-L)*(X1-X0),b=near(bs,t),h=near(hyAll,t),c=near(tyAll,t);
+ const ph=PH.find(p=>t>=T(p.a)&&t<=T(p.b)+864e5);
+ const ha=h[0]<hyD[0][0],ca=c[0]<tyD[0][0];
+ cross.setAttribute('x1',vx);cross.setAttribute('x2',vx);cross.setAttribute('opacity','.45');
+ tip.innerHTML=`<div class="d">${iso(b[0])}</div><div class="ph">${ph?(ph.label||STG[ph.s].name):''}</div>`+
+  `<div><i style="background:var(--assets)"></i>總資產 ${b[1].toFixed(2)} 兆</div><div><i style="background:var(--net)"></i>淨流動性 ${b[2].toFixed(2)} 兆</div>`+
+  `<div><i style="background:var(--res)"></i>準備金 ${b[3].toFixed(2)}・TGA ${b[4].toFixed(2)}・RRP ${b[5].toFixed(2)}</div>`+
+  `<div><i style="background:var(--sp)"></i>S&amp;P ${Math.round(near(ix,t)[1]).toLocaleString()}・<i style="background:var(--nq)"></i>Nasdaq ${Math.round(near(ix,t)[2]).toLocaleString()}</div>`+
+  `<div><i style="background:var(--ink)"></i>政策利率 ${rng2(rateAt(t))}</div>`+
+  `<div><i style="background:var(--hy)"></i>HY OAS ${ha?'約 ':''}${h[1].toFixed(ha?1:2)}%</div><div><i style="background:var(--curve)"></i>10Y−2Y ${ca?'約 ':''}${c[1].toFixed(2)}</div>`;
+ tip.style.display='block';const wr=wrap.getBoundingClientRect();let lx=ev.clientX-wr.left+14;if(lx+tip.offsetWidth>wr.width-6)lx=ev.clientX-wr.left-tip.offsetWidth-14;
+ tip.style.left=Math.max(4,lx)+'px';tip.style.top=Math.max(4,ev.clientY-wr.top-40)+'px';}
+function hide(){tip.style.display='none';cross.setAttribute('opacity','0')}
+svg.addEventListener('pointermove',move);svg.addEventListener('pointerdown',move);svg.addEventListener('pointerleave',hide);
+
+// ---------- events list ----------
+document.getElementById('events').innerHTML=EV.map(e=>`<li><time>${e[0]}</time>${e[1]}<span class="k" style="background:${cv(EK[e[2]][1])}">${EK[e[2]][0]}</span></li>`).join('');
+
+{const f=(up)=>{let prev=FF0,out=[];FF.forEach(r=>{const u=r[1]>prev,bp=Math.round(Math.abs(r[1]-prev)*100);if(u==up)out.push(r[2]+(bp!=25?`（${bp}bp）`:''));prev=r[1]});return out};
+ const hk=f(true),ct=f(false);
+ document.getElementById('rates').innerHTML=`<p><b style="color:var(--qt2)">▲ 升息 ${hk.length} 次</b>（未註明者為 25bp）：${hk.join('、')}</p><p><b style="color:var(--qe1)">▼ 降息 ${ct.length} 次</b>：${ct.join('、')}</p>`;}
+// ---------- phase table ----------
+const rng=(arr,a,b,hi,lo)=>{const s=arr.filter(r=>r[0]>=a&&r[0]<=b);return [Math.min(...s.map(r=>r[lo])),Math.max(...s.map(r=>r[hi]))]};
+document.querySelector('#phases tbody').innerHTML=PH.map((ph,i)=>{const st=STG[ph.s],a=T(ph.a),b=T(ph.b);
+ const seg=bs.filter(r=>r[0]>=a&&r[0]<=b),n0=seg[0][2],n1=seg[seg.length-1][2],d=n1-n0;
+ const h=rng(hyAll,a,b,2,3),c=rng(tyAll,a,b,2,3);const ha=a<hyD[0][0],ca=false;
+ const f=v=>(v<0?'−':'')+Math.abs(v).toFixed(2);
+ return `<tr id="ph${i}"><td><span class="chip" style="background:${cv(st.c)}">${ph.label||st.name}</span></td><td class="per">${ph.a.slice(0,7)} →<br>${ph.open?'現在':ph.b.slice(0,7)}</td><td>${st.mkt}</td><td>${st.act}</td>`+
+ `<td class="num">${n0.toFixed(2)} → <b>${n1.toFixed(2)}</b><br><span class="${d>=0?'up':'dn'}">${d>=0?'+':'−'}${Math.abs(d).toFixed(2)}</span></td>`+
+ `<td class="num"><b class="${(ph.pr||[0,0])[0]>=0?'up':'dn'}">${(ph.pr||[0,0])[0]>=0?'+':'−'}${Math.abs((ph.pr||[0,0])[0])}%</b></td><td class="num"><b class="${(ph.pr||[0,0])[1]>=0?'up':'dn'}">${(ph.pr||[0,0])[1]>=0?'+':'−'}${Math.abs((ph.pr||[0,0])[1])}%</b></td>`+
+ `<td class="num">${rateAt(a).toFixed(2)} → <b>${rateAt(Math.min(b,tyD[tyD.length-1][0])).toFixed(2)}</b>%</td>`+
+ `<td class="num">${ha?'約 ':''}${h[0].toFixed(1)} – ${h[1].toFixed(1)}%</td><td class="num">${ca?'約 ':''}${f(c[0])} – ${f(c[1])}</td><td>${ph.n}</td></tr>`;}).join('');
+svg.querySelectorAll('.rib').forEach(el=>el.addEventListener('click',()=>{document.querySelectorAll('tr.hit').forEach(r=>r.classList.remove('hit'));const r=document.getElementById('ph'+el.dataset.i);r.classList.add('hit');r.scrollIntoView({block:'center',behavior:'smooth'});}));
+
+{const back=(arr,days)=>near(arr,arr[arr.length-1][0]-days*864e5);
+ const sg=(v,d,u)=>`<span class="${v>=0?'up':'dn'}">${v>=0?'+':'−'}${Math.abs(v).toFixed(d)}${u}</span>`;
+ const dn=last[2]-back(bs,91)[2], dr=last[3]-back(bs,91)[3];
+ const flow=dn<-.3?'快速流失：歷史上此時 S&P 13 週上漲機率約 4 成':dn<-.1?'流出':dn<=.1?'持平':dn<=.3?'流入':'快速流入';
+ const dh=(hl[1]-back(hyD,91)[1])*100, dc=tl[1]-back(tyD,91)[1];
+ const spL=spD[spD.length-1],nqL=nqD[nqD.length-1],sp13=(spL[1]/back(spD,91)[1]-1)*100,nq13=(nqL[1]/back(nqD,91)[1]-1)*100;
+ const hi=arr=>Math.max(...arr.filter(r=>r[0]>=arr[arr.length-1][0]-365*864e5).map(r=>r[1]));
+ const spDD=(spL[1]/hi(spD)-1)*100,nqDD=(nqL[1]/hi(nqD)-1)*100;
+ const fl=FF[FF.length-1],fp=FF.length>1?FF[FF.length-2][1]:FF0,up=fl[1]>fp;
+ const bs13=last[1]-back(bs,91)[1];
+ const align=(up&&bs13>.03)?'升息但總資產在增加：不同步':(up&&bs13<-.03)?'升息且縮表：同步緊縮':(!up&&bs13<-.03)?'降息但總資產在縮：不同步':(!up&&bs13>.03)?'降息且擴表：同步寬鬆':'總資產持平';
+ const div=(sp13>0&&dh>30)?'分歧：股市漲、利差擴大':(sp13<0&&dh<-30)?'分歧：股市跌、利差收斂':(sp13<0&&dh>30)?'同步轉弱':'未見分歧';
+ const cur=PH[PH.length-1];
+ const tile=(k,v,c,r)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="c">${c}</div>${r?`<div class="r">${r}</div>`:''}</div>`;
+ document.getElementById('tiles').innerHTML=
+  tile('目前階段（人工判斷）',`<span class="chip" style="background:${cv(STG[cur.s].c)};font-size:17px">${cur.label||STG[cur.s].name}</span>`,`${cur.a} 起`,'')+
+  tile('淨流動性',`${last[2].toFixed(2)} <small>兆</small>`,`13 週 ${sg(dn,2,' 兆')}・${iso(last[0])}`,flow)+
+  tile('銀行準備金',`${last[3].toFixed(2)} <small>兆</small>`,`13 週 ${sg(dr,2,' 兆')}`,'2019-09 低點為 1.39 兆')+
+  tile('政策利率',rng2(fl[1]),`${fl[2]} ${up?'升':'降'}息 ${Math.round(Math.abs(fl[1]-fp)*100)}bp`,align)+
+  tile('HY 利差',`${hl[1].toFixed(2)}<small>%</small>`,`13 週 <span class="${dh>0?'dn':'up'}">${dh>=0?'+':'−'}${Math.abs(dh).toFixed(0)}bp</span>・${iso(hl[0])}`,div)+
+  tile('10Y−2Y',`${tl[1].toFixed(2)}`,`13 週 ${sg(dc,2,'')}・${iso(tl[0])}`,tl[1]<0?'倒掛中':'未倒掛')+
+  tile('S&amp;P 500',Math.round(spL[1]).toLocaleString(),`13 週 ${sg(sp13,1,'%')}`,`距 52 週高點 ${spDD.toFixed(1)}%`)+
+  tile('Nasdaq',Math.round(nqL[1]).toLocaleString(),`13 週 ${sg(nq13,1,'%')}`,`距 52 週高點 ${nqDD.toFixed(1)}%`);
+ document.getElementById('now').innerHTML=`資料更新：<b>${S.updated}</b>。資產負債表為週資料（每週四公布週三數值），其餘為日資料。滑過圖表看數值，點上方色帶跳到該階段。`;}
+})().catch(e=>{document.getElementById('now').textContent='資料載入失敗：'+e.message+'（請確認 cycle_data.json 與本頁在同一資料夾）';});
+</script>
+</body>
+</html>
