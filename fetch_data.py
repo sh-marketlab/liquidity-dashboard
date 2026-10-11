@@ -58,9 +58,9 @@ def build_supply():
     series = {}
     ids = {
         "WALCL": START,        # Fed 總資產
-        "WTREGEN": START,      # TGA
-        "WLRRAL": START,       # RRP (週均, Millions)
-        "WRESBAL": START,      # 銀行準備金
+        "WDTGAL": START,      # TGA
+        "WLRRAL": START,       # RRP (週三值, Millions)
+        "WRBWFRBL": START,      # 銀行準備金
         "SOFR": SPREAD_START,
         "IORB": SPREAD_START,
         "RPONTSYD": SPREAD_START,  # SRF 使用量
@@ -74,7 +74,7 @@ def build_supply():
             series[sid] = []
 
     # 淨流動性 = WALCL - TGA - RRP，以 WALCL 的日期為準
-    tga_map, rrp_map = to_map(series["WTREGEN"]), to_map(series["WLRRAL"])
+    tga_map, rrp_map = to_map(series["WDTGAL"]), to_map(series["WLRRAL"])
     tga_dates, rrp_dates = sorted(tga_map), sorted(rrp_map)
     net_liq = []
     for d, walcl in series["WALCL"]:
@@ -99,9 +99,9 @@ def build_supply():
 
     return {
         "net_liquidity": net_liq,
-        "reserves": series["WRESBAL"],
+        "reserves": series["WRBWFRBL"],
         "walcl": series["WALCL"],
-        "tga": series["WTREGEN"],
+        "tga": series["WDTGAL"],
         "rrp": series["WLRRAL"],
         "spread_daily": spread_daily,
         "spread_weekly": spread_weekly,
