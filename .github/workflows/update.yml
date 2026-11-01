@@ -28,10 +28,17 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python fetch_cycle.py
 
+      - name: Fetch watch dashboard data
+        continue-on-error: true
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python fetch_watch.py
+
       - name: Commit if changed
         run: |
           git config user.name "dashboard-bot"
           git config user.email "bot@users.noreply.github.com"
           git add docs/data.json docs/cycle_data.json
+          git add docs/watch_data.json || true
           git diff --cached --quiet || git commit -m "data update"
           git push
