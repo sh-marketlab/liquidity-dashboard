@@ -132,7 +132,7 @@ def twse_foreign_and_margin(n=25):
             j = json.loads(http_get(f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate={ds}&response=json"))
             if j.get("stat") == "OK":
                 for r in _rows(j.get("data", [])):
-                    if "外資及陸資" in str(r[0]) and "自營" not in str(r[0]):
+                    if str(r[0]).strip().startswith("外資及陸資"):  # 「外資及陸資(不含外資自營商)」
                         v = _num(r[-1])
                         if v is not None:
                             foreign.append([d.isoformat(), round(v / 1e8, 1)])  # 元 → 億元
