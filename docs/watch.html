@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日觀察儀表板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 與 index.html 同一套色票：深藍底、青綠＝正常、琥珀＝留意、紅＝觸發 */
+  :root{
+    --bg:#0B1220; --panel:#111B2D; --panel2:#0E1626; --line:#1E2A40;
+    --ink:#D9E2EF; --muted:#7E8CA3; --faint:#4A5670;
+    --teal:#3FB8AF; --amber:#E0A458; --red:#E2606B; --blue:#5B8DD9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    font-size:14px;line-height:1.55;padding:24px max(16px,4vw) 60px}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  a{color:var(--blue)}
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;margin-bottom:4px}
+  h1{font-size:20px;font-weight:700;letter-spacing:.04em}
+  nav{margin-left:auto;font-size:12px;display:flex;gap:14px}
+  nav a{color:var(--muted);text-decoration:none} nav a:hover{color:var(--ink)}
+  #updated{color:var(--muted);font-size:12px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
+
+  /* 階段尺 */
+  #stage{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+  #stage .k{font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:10px}
+  .steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-bottom:12px}
+  .step{border-radius:4px;padding:6px 4px;font-size:11px;min-width:0;overflow-wrap:anywhere;text-align:center;background:var(--panel2);color:var(--faint);border:1px solid var(--line)}
+  .step b{display:block;font-size:13px}
+  .step.on.l0{background:rgba(63,184,175,.16);color:var(--teal);border-color:var(--teal)}
+  .step.on.l1{background:rgba(224,164,88,.16);color:var(--amber);border-color:var(--amber)}
+  .step.on.l2{background:rgba(226,96,107,.18);color:var(--red);border-color:var(--red)}
+  .step.self{border-style:dashed}
+  .crit{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .crit summary{cursor:pointer;color:var(--blue)}
+  .crit ul{margin:6px 0 0 18px;display:flex;flex-direction:column;gap:3px}
+  .crit b{color:var(--ink);font-weight:500}
+  #stage .act{font-size:14px;font-weight:500}
+  #stage .why{font-size:12px;color:var(--muted);margin-top:4px}
+
+  /* 注意清單＋行事曆 */
+  .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:8px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;min-width:0}
+  .box h2{font-size:11px;color:var(--muted);letter-spacing:.1em;font-weight:500;margin-bottom:8px}
+  .flags{display:flex;flex-direction:column;gap:6px}
+  .flagrow{display:flex;gap:8px;align-items:baseline;font-size:13px}
+  .flagrow .t{color:var(--muted);font-size:12px}
+  .empty{color:var(--muted);font-size:13px}
+  .cal{display:flex;flex-direction:column;gap:5px}
+  .ev{display:grid;grid-template-columns:72px 1fr;gap:8px;font-size:13px}
+  .ev .d{color:var(--muted)}
+  .ev.today .d{color:var(--amber)}
+  .ev .approx{color:var(--faint);font-size:11px}
+
+  /* 指標列 */
+  section h2.sec{font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:500;
+    border-bottom:1px solid var(--line);padding-bottom:8px;margin:26px 0 4px;display:flex;gap:10px;align-items:baseline}
+  section h2.sec b{color:var(--ink)}
+  section h2.sec span{font-size:11px;letter-spacing:.04em;color:var(--faint)}
+  .row{display:grid;grid-template-columns:12px minmax(150px,1.3fr) 120px 110px 150px minmax(0,1.6fr);
+    gap:12px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--panel2)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--faint)}
+  .s-ok .dot{background:var(--teal)} .s-watch .dot{background:var(--amber)} .s-alert .dot{background:var(--red)}
+  .s-info .dot{background:transparent;border:1.5px solid var(--muted)}
+  .s-watch{background:linear-gradient(90deg,rgba(224,164,88,.07),transparent 60%)}
+  .s-alert{background:linear-gradient(90deg,rgba(226,96,107,.10),transparent 60%)}
+  .nm{min-width:0} .nm .n{font-size:13px;font-weight:500}
+  .nm .src{font-size:10.5px;color:var(--faint)}
+  .val{text-align:right;font-size:15px;font-weight:600}
+  .val small{display:block;font-size:10.5px;color:var(--faint);font-weight:400}
+  .chg{text-align:right;font-size:12px;color:var(--muted)}
+  .chg .up{color:var(--ink)}
+  .chg small{display:block;font-size:10.5px;color:var(--faint)}
+  svg.spark{width:150px;height:34px;display:block}
+  .rule{font-size:12px;color:var(--muted);min-width:0}
+  .rule .a{color:var(--ink)}
+  .s-alert .rule .a{color:var(--red)} .s-watch .rule .a{color:var(--amber)}
+  .rule .nt{color:var(--faint);font-size:11px}
+
+  .manual{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:10px}
+  .manual a{display:block;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-size:13px;color:var(--ink);text-decoration:none}
+  .manual a:hover{border-color:var(--blue)}
+  .manual a span{display:block;font-size:11px;color:var(--muted)}
+  #setup{display:none;background:var(--panel);border:1px dashed var(--amber);border-radius:8px;padding:20px;margin:16px 0;color:var(--amber);font-size:13px}
+  footer{margin-top:36px;color:var(--faint);font-size:11px;line-height:1.7}
+
+  @media (max-width:860px){
+    .two{grid-template-columns:1fr}
+    .row{grid-template-columns:12px minmax(0,1fr) auto;grid-template-areas:"d n v" "d s c" "d r r";row-gap:4px}
+    .row .dot{grid-area:d;align-self:start;margin-top:5px}
+    .row .nm{grid-area:n} .row .val{grid-area:v}
+    .row .sp{grid-area:s} .row .chg{grid-area:c}
+    .row .rule{grid-area:r}
+    svg.spark{width:100%;max-width:220px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>每日觀察儀表板</h1>
+  <span id="updated" class="mono">載入中…</span>
+  <nav><a href="index.html">流動性供需</a><a href="cycle.html">週期</a></nav>
+</header>
+<p class="sub">判讀順序：階段 → 需要注意 → 未來兩週行事曆 → 有燈號的指標。綠＝正常、黃＝留意、紅＝觸發動作、空心＝只看趨勢。門檻在 fetch_watch.py 的 RULES 調整。</p>
+
+<div id="setup">尚未產生 watch_data.json。請到 Actions 手動執行一次 Update dashboard data。</div>
+
+<div id="stage">
+  <div class="k">壓力階段（依研究框架「壓力分階段規則」；數字是階段編號，不是指標數值）</div>
+  <div class="steps" id="steps"></div>
+  <details class="crit"><summary>各階段怎麼判斷</summary>
+    <ul>
+      <li><b>0 常態</b>：下列條件都沒發生 → 照常規配置，紅隊等均線</li>
+      <li><b>1 壓力上升</b>（系統判斷，任一成立）：HY OAS 一個月擴大 ≥100bp 或 ≥5%、STLFSI4 &gt;0 且 4 週上升 ≥0.5、VIX ≥30 → 紅隊暫停加碼，藍隊不動</li>
+      <li><b>2 急性壓力</b>（系統判斷，任一成立）：VIX ≥40、非月底 SRF 大量使用、非月底 SOFR−IORB 急升 → 不接刀，不做不可逆的決定</li>
+      <li><b>3 見頂與托底</b>（自行判斷）：Fed 或財政部已出手，且 STLFSI4、HY OAS 從高點回落 → 紅隊分 3 批進場，每批間隔至少 1 週</li>
+      <li><b>4 修復</b>（自行判斷）：指標回到門檻內 → 恢復常規，檢討決策日誌</li>
+    </ul>
+  </details>
+  <div class="act" id="stage-act"></div>
+  <div class="why" id="stage-why"></div>
+</div>
+
+<div class="two">
+  <div class="box"><h2>需要注意</h2><div class="flags" id="flags"></div></div>
+  <div class="box"><h2>未來 14 天（台灣時間）</h2><div class="cal" id="cal"></div></div>
+</div>
+
+<div id="groups"></div>
+
+<section>
+  <h2 class="sec"><b>手動檢查</b><span>沒有免費 API 的項目，每週或每月點進去看</span></h2>
+  <div class="manual">
+    <a href="https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html" target="_blank" rel="noopener">CME FedWatch<span>每日｜利率路徑預期，對照 2Y</span></a>
+    <a href="https://www.worldgovernmentbonds.com/cds-historical-data/united-states/5-years/" target="_blank" rel="noopener">美國 5Y 主權 CDS<span>每週｜只看方向</span></a>
+    <a href="http://openinsider.com/latest-cluster-buys" target="_blank" rel="noopener">OpenInsider 叢集買進<span>每週｜多位高管同期買進</span></a>
+    <a href="https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/" target="_blank" rel="noopener">ISM 製造業 PMI<span>每月第一個工作日｜看新訂單減庫存</span></a>
+    <a href="https://www.federalreserve.gov/data/sloos.htm" target="_blank" rel="noopener">SLOOS 原始報告<span>每季｜放款標準、擔保要求</span></a>
+    <a href="https://mops.twse.com.tw/mops/web/t05st10_ifrs" target="_blank" rel="noopener">公開資訊觀測站 月營收<span>每月 10 日前｜台積電等</span></a>
+    <a href="https://www.mof.gov.tw/multiplehtml/384fb3077bb349ea973e7fc6f13b6974" target="_blank" rel="noopener">財政部 進出口統計<span>每月上旬</span></a>
+    <a href="https://www.moea.gov.tw/MNS/dos/content/SubMenu.aspx?menu_id=6731" target="_blank" rel="noopener">經濟部 外銷訂單<span>每月下旬</span></a>
+    <a href="https://index.ndc.gov.tw/n/zh_tw" target="_blank" rel="noopener">國發會 景氣指標查詢系統<span>每月下旬｜燈號與領先指標</span></a>
+    <a href="https://www.cbc.gov.tw/tw/lp-302-1.html" target="_blank" rel="noopener">中央銀行 新聞稿<span>理監事會、M1B/M2、外匯存底</span></a>
+    <a href="https://www.lia-roc.org.tw/" target="_blank" rel="noopener">壽險公會 統計<span>每月｜壽險業海外投資與避險</span></a>
+  </div>
+</section>
+
+<footer>
+  資料來源：FRED（St. Louis Fed）、Yahoo Finance（MOVE、USD/TWD）、CNN Fear &amp; Greed、臺灣證券交易所。<br>
+  FRED 部分序列有落後（廣義美元指數約一週、H.4.1 為週三數值於週四公布）。燈號門檻是起始值，用歷史資料回測後再調整。本頁只是觀察工具，不構成投資建議。
+</footer>
+
+<script>
+// ---------- 行事曆：固定日期 ＋ 每週規律事件 ----------
+// approx:true 代表日期為估計，請以官方公告為準
+const EVENTS = [
+  ["2026-11-02","ISM 製造業 23:00"],
+  ["2026-11-04","美國期中選舉結果（11/3 投票）"],
+  ["2026-11-04","財政部季度再融資公告",true],
+  ["2026-11-06","非農就業 21:30"],
+  ["2026-11-10","台積電 10 月營收",true],
+  ["2026-11-11","美債市休市（股市照常）"],
+  ["2026-11-19","FOMC 會議紀要 03:00"],
+  ["2026-11-20","月選擇權到期"],
+  ["2026-11-20","Nvidia 財報",true],
+  ["2026-11-26","感恩節 美股休市"],
+  ["2026-11-27","美股 13:00（美東）提早收盤"],
+  ["2026-11-30","MSCI 季度調整生效",true],
+  ["2026-12-01","ISM 製造業 23:00"],
+  ["2026-12-04","非農就業 21:30"],
+  ["2026-12-10","FOMC 利率決議＋點陣圖 03:00"],
+  ["2026-12-10","台積電 11 月營收",true],
+  ["2026-12-11","Russell 重組生效（收盤後）",true],
+  ["2026-12-15","企業預估稅截止：TGA↑ 準備金↓"],
+  ["2026-12-15","回購靜默期陸續開始",true],
+  ["2026-12-17","台灣央行理監事會",true],
+  ["2026-12-18","四巫日＋S&P／Nasdaq-100 調整"],
+  ["2026-12-24","美股 13:00（美東）提早收盤"],
+  ["2026-12-25","聖誕節 美股休市"],
+  ["2027-01-01","元旦 美股休市"],
+  ["2027-01-04","ISM 製造業 23:00"],
+  ["2027-01-08","非農就業 21:30",true],
+  ["2027-01-14","大型銀行財報開跑",true],
+  ["2027-01-15","個人預估稅＋月選擇權到期"],
+];
+
+function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+function renderCal(){
+  const now = new Date(); now.setHours(0,0,0,0);
+  const end = new Date(now); end.setDate(end.getDate()+14);
+  const list = EVENTS.map(e=>({d:e[0],t:e[1],a:!!e[2]}));
+  for(let d=new Date(now); d<=end; d.setDate(d.getDate()+1)){
+    if(d.getDay()===4) list.push({d:iso(d),t:"初領失業金 21:30"});
+    if(d.getDay()===5) list.push({d:iso(d),t:"Fed H.4.1 資產負債表（05:30）"});
+  }
+  const t0=iso(now), t1=iso(end);
+  const rows = list.filter(e=>e.d>=t0 && e.d<=t1).sort((a,b)=>a.d.localeCompare(b.d));
+  const wd="日一二三四五六";
+  document.getElementById("cal").innerHTML = rows.length ? rows.map(e=>{
+    const d=new Date(e.d+"T00:00:00");
+    return `<div class="ev${e.d===t0?" today":""}"><span class="d mono">${e.d.slice(5).replace("-","/")}（${wd[d.getDay()]}）</span><span>${e.t}${e.a?' <span class="approx">約</span>':""}</span></div>`;
+  }).join("") : '<div class="empty">未來兩週沒有排定的重點事件。請更新 watch.html 裡的 EVENTS。</div>';
+}
+
+// ---------- 數字格式 ----------
+function fmtVal(i, v){
+  if(v===null||v===undefined) return "—";
+  if(i.unit==="百萬美元") return Math.abs(v)>=1e6 ? (v/1e6).toFixed(2)+" 兆" : (v/1e3).toFixed(1)+" B";
+  if(i.unit==="人") return Math.round(v).toLocaleString();
+  if(i.unit==="千人") return Math.round(v)+"K";
+  const dec = Math.abs(v)>=1000?0:(Math.abs(v)>=100?1:(i.id==="twd"?3:2));
+  return v.toLocaleString(undefined,{minimumFractionDigits:dec,maximumFractionDigits:dec});
+}
+function fmtChg(i){
+  const c=i.chg; if(c===null||c===undefined) return "—";
+  const sign=c>0?"+":"";
+  if(i.unit==="百萬美元") return sign+(c/1e3).toFixed(0)+" B";
+  if(i.chg_label && i.chg_label.includes("%")) return sign+c.toFixed(2)+"%";
+  if(i.unit==="%" || i.unit==="百分點"){
+    if(["cpi","core_cpi","ppi","core_pce","unrate","umich_inf","sahm","term_premium","sloos"].includes(i.id)) return sign+c.toFixed(2);
+    return sign+Math.round(c*100)+" bp";
+  }
+  if(i.unit==="千人") return sign+Math.round(c)+"K";
+  if(i.unit==="億元") return sign+Math.round(c)+" 億";
+  return sign+(Math.abs(c)>=100?Math.round(c):c.toFixed(1));
+}
+const UNIT_LABEL = {"%":"%","百分點":"百分點","百萬美元":"美元","人":"人","千人":"人","億元":"新台幣","十億美元":"十億美元"};
+
+// ---------- 迷你走勢 ----------
+function spark(pts, status){
+  if(!pts || pts.length<2) return '<svg class="spark" viewBox="0 0 150 34"></svg>';
+  const W=150,H=34,P=3;
+  const ys=pts.map(p=>p[1]); let lo=Math.min(...ys), hi=Math.max(...ys); if(hi===lo){hi+=1;lo-=1;}
+  const x=k=>P+(W-2*P)*k/(pts.length-1), y=v=>H-P-(H-2*P)*(v-lo)/(hi-lo);
+  const line=pts.map((p,k)=>(k?"L":"M")+x(k).toFixed(1)+" "+y(p[1]).toFixed(1)).join(" ");
+  const col={ok:"var(--teal)",watch:"var(--amber)",alert:"var(--red)"}[status]||"var(--blue)";
+  const zero = (lo<0&&hi>0)?`<line x1="${P}" x2="${W-P}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="var(--line)" stroke-dasharray="2 3"/>`:"";
+  const lx=x(pts.length-1), ly=y(ys[ys.length-1]);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${zero}
+    <path d="${line} L${lx.toFixed(1)} ${H-P} L${P} ${H-P} Z" fill="${col}" opacity=".12"/>
+    <path d="${line}" fill="none" stroke="${col}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.4" fill="${col}"/></svg>`;
+}
+
+// ---------- 版面 ----------
+const GROUPS = [
+  ["daily","每日","自動提醒為主，有燈號才細看"],
+  ["weekly","每週","週四 H.4.1 公布後，週末一次看完"],
+  ["monthly","每月","發布當週看趨勢，不看單月"],
+  ["quarterly","每季","「條件變化」的真正數據"],
+  ["taiwan","台灣","匯率、外資、散戶槓桿"],
+];
+const LABEL = {ok:"正常",watch:"留意",alert:"觸發",info:"趨勢",na:"無資料"};
+
+function row(i){
+  const st=i.status||"na";
+  const showAct = (st==="watch"||st==="alert") && i.action;
+  const rule = showAct
+    ? `<div class="a">${i.action}</div><div>${i.rule||""}</div>`
+    : `<div>${i.rule||""}${i.rule&&i.action?"｜":""}${i.action||""}</div>`;
+  return `<div class="row s-${st}" title="${LABEL[st]}">
+    <span class="dot" aria-label="${LABEL[st]}"></span>
+    <div class="nm"><div class="n">${i.name}</div><div class="src mono">${i.source}${i.date?" · "+i.date:""}</div></div>
+    <div class="val mono">${fmtVal(i,i.value)}<small>${UNIT_LABEL[i.unit]||""}</small></div>
+    <div class="chg mono"><span class="${(i.chg||0)>0?"up":""}">${fmtChg(i)}</span><small>${i.chg_label||""}</small></div>
+    <div class="sp">${spark(i.spark,st)}</div>
+    <div class="rule">${rule}${i.note?`<div class="nt">${i.note}</div>`:""}</div>
+  </div>`;
+}
+
+function render(d){
+  document.getElementById("updated").textContent = "更新 " + d.updated;
+  const s=d.stage, names=["常態","壓力上升","急性壓力","見頂與托底","修復"];
+  document.getElementById("steps").innerHTML = names.map((n,k)=>
+    `<div class="step l${k} ${k===s.level?"on":""} ${k>=3?"self":""}"><b class="mono">${k}</b>${n}</div>`).join("");
+  document.getElementById("stage-act").textContent = s.action;
+  document.getElementById("stage-why").textContent = s.reasons.length
+    ? "原因：" + s.reasons.join("、")
+    : "所有自動判斷的壓力訊號都在門檻內。階段 3 需確認 Fed 或財政部已出手、STLFSI4 與 HY OAS 從高點回落。";
+
+  const hot = d.indicators.filter(i=>i.status==="alert").concat(d.indicators.filter(i=>i.status==="watch"));
+  document.getElementById("flags").innerHTML = hot.length ? hot.map(i=>
+    `<div class="flagrow"><span class="flag-dot" style="color:${i.status==="alert"?"var(--red)":"var(--amber)"}">●</span>
+     <span>${i.name} <span class="mono">${fmtVal(i,i.value)}</span></span><span class="t">${i.status==="alert"?i.action:(i.note||i.rule)}</span></div>`).join("")
+    : '<div class="empty">今天沒有黃燈或紅燈。看完行事曆就可以關掉了。</div>';
+
+  const na = d.indicators.filter(i=>i.status==="na").map(i=>i.name);
+  document.getElementById("groups").innerHTML = GROUPS.map(([g,t,sub])=>{
+    const items=d.indicators.filter(i=>i.group===g);
+    if(!items.length) return "";
+    return `<section><h2 class="sec"><b>${t}</b><span>${sub}</span></h2>${items.map(row).join("")}</section>`;
+  }).join("") + (na.length?`<p class="sub" style="margin-top:12px">本次無資料：${na.join("、")}（來源暫時抓不到，下次更新會重試）</p>`:"");
+}
+
+renderCal();
+fetch("watch_data.json",{cache:"no-store"}).then(r=>{ if(!r.ok) throw 0; return r.json(); })
+  .then(render).catch(()=>{ document.getElementById("setup").style.display="block"; document.getElementById("updated").textContent="尚無資料"; });
+</script>
+</body>
+</html>
