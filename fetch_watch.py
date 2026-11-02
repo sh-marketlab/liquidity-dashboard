@@ -253,13 +253,14 @@ def main():
 
     print("FRED...")
     f = {sid: safe(sid, fred, sid) for sid in [
-        "BAMLH0A0HYM2", "SOFR", "IORB", "RPONTSYD", "DGS2", "VIXCLS", "DTWEXBGS", "T10Y2Y",
+        "BAMLH0A0HYM2", "SOFR", "IORB", "RPONTSYD", "DGS2", "VIXCLS", "T10Y2Y",
         "WLCFLPCL", "WRBWFRBL", "WDTGAL", "WLRRAL", "WALCL", "STLFSI4", "ICSA",
         "CPIAUCSL", "CPILFESL", "PPIFIS", "PCEPILFE", "PAYEMS", "UNRATE", "SAHMREALTIME",
         "UMCSENT", "MICH", "DRTSCILM", "THREEFYTP10", "DEXTAUS",
     ]}
     print("其他來源...")
     move = safe("MOVE", yahoo, "^MOVE")
+    dxy_s = safe("DXY", yahoo, "DX-Y.NYB")
     twd = safe("USD/TWD", yahoo, "TWD=X") or f["DEXTAUS"]
     fg = safe("Fear & Greed", cnn_fear_greed)
     foreign, margin = twse_foreign_and_margin()
@@ -322,11 +323,11 @@ def main():
         f"≥ {R['move']['watch']}", "債市不穩會傳導到抵押品與融資，提高現金意識",
         "Yahoo ^MOVE", "1 週", chg(move, 5), 1))
 
-    dxy = f["DTWEXBGS"]
+    dxy = dxy_s
     c = pct_chg(dxy, 21)
-    out.append(ind("dxy", "daily", "美元指數（廣義）", dxy, "", level(abs(c) if c is not None else None, R["dxy_chg1m"]),
+    out.append(ind("dxy", "daily", "美元指數 DXY", dxy, "", level(abs(c) if c is not None else None, R["dxy_chg1m"]),
         f"一個月變動 ≥ {R['dxy_chg1m']['watch']}%", "檢查新台幣匯率與外資買賣超",
-        "FRED DTWEXBGS（約落後一週）", "1 個月 %", c, 2))
+        "Yahoo DX-Y.NYB（ICE 美元指數）", "1 個月 %", c, 2))
 
     # ---------------- 每週 ----------------
     pc = f["WLCFLPCL"]
