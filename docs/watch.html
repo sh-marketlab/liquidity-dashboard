@@ -56,6 +56,9 @@
   .ev .d{color:var(--muted)}
   .ev.today .d{color:var(--amber)}
   .ev .approx{color:var(--faint);font-size:11px}
+  .ev .qra{color:var(--blue);font-size:11px}
+  .ev.hot span:last-child{color:var(--amber)}
+  .ev.win .d{color:var(--blue)}
 
   /* 指標列 */
   section h2.sec{font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:500;
@@ -105,7 +108,7 @@
 <header>
   <h1>每日觀察儀表板</h1>
   <span id="updated" class="mono">載入中…</span>
-  <nav><a href="index.html">流動性供需</a><a href="cycle.html">週期</a></nav>
+  <nav><a href="index.html">流動性供需</a><a href="cycle.html">週期</a><a href="calendar.html">債務日曆</a></nav>
 </header>
 <p class="sub">判讀順序：階段 → 需要注意 → 未來兩週行事曆 → 有燈號的指標。綠＝正常、黃＝留意、紅＝觸發動作、空心＝只看趨勢。門檻在 fetch_watch.py 的 RULES 調整。</p>
 
@@ -192,10 +195,19 @@ const EVENTS = [
 
 function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
+// 債務日曆（calendar_events.json）：單日事件併入 14 天清單；期間事件在進行中時置頂
+let DEBT = [];
 function renderCal(){
   const now = new Date(); now.setHours(0,0,0,0);
   const end = new Date(now); end.setDate(end.getDate()+14);
   const list = EVENTS.map(e=>({d:e[0],t:e[1],a:!!e[2]}));
+  const t0d=iso(now), t1d=iso(end);
+  const wins=[];
+  DEBT.forEach(e=>{
+    if(e.end){
+      if(e.d<=t1d && e.end>=t0d) wins.push(e);
+    } else list.push({d:e.d,t:e.t,a:!!e.approx,q:e.tag,h:!!e.hot});
+  });
   for(let d=new Date(now); d<=end; d.setDate(d.getDate()+1)){
     if(d.getDay()===4) list.push({d:iso(d),t:"初領失業金 21:30"});
     if(d.getDay()===5) list.push({d:iso(d),t:"Fed H.4.1 資產負債表（05:30）"});
@@ -203,9 +215,10 @@ function renderCal(){
   const t0=iso(now), t1=iso(end);
   const rows = list.filter(e=>e.d>=t0 && e.d<=t1).sort((a,b)=>a.d.localeCompare(b.d));
   const wd="日一二三四五六";
-  document.getElementById("cal").innerHTML = rows.length ? rows.map(e=>{
+  const winHtml = wins.map(e=>`<div class="ev win${e.hot?" hot":""}"><span class="d mono">${e.d<=t0?"進行中":e.d.slice(5).replace("-","/")+" 起"}</span><span>${e.t}${e.approx?' <span class="approx">約</span>':""} <span class="qra">至 ${e.end.slice(2).replace(/-/g,"/")}</span></span></div>`).join("");
+  document.getElementById("cal").innerHTML = (rows.length||wins.length) ? winHtml + rows.map(e=>{
     const d=new Date(e.d+"T00:00:00");
-    return `<div class="ev${e.d===t0?" today":""}"><span class="d mono">${e.d.slice(5).replace("-","/")}（${wd[d.getDay()]}）</span><span>${e.t}${e.a?' <span class="approx">約</span>':""}</span></div>`;
+    return `<div class="ev${e.d===t0?" today":""}${e.h?" hot":""}"><span class="d mono">${e.d.slice(5).replace("-","/")}（${wd[d.getDay()]}）</span><span>${e.t}${e.a?' <span class="approx">約</span>':""}${e.q?` <a class="qra" href="calendar.html">${e.q}</a>`:""}</span></div>`;
   }).join("") : '<div class="empty">未來兩週沒有排定的重點事件。請更新 watch.html 裡的 EVENTS。</div>';
 }
 
@@ -300,6 +313,7 @@ function render(d){
 }
 
 renderCal();
+fetch("calendar_events.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.events){ DEBT=j.events; renderCal(); } }).catch(()=>{});
 fetch("watch_data.json",{cache:"no-store"}).then(r=>{ if(!r.ok) throw 0; return r.json(); })
   .then(render).catch(()=>{ document.getElementById("setup").style.display="block"; document.getElementById("updated").textContent="尚無資料"; });
 </script>
