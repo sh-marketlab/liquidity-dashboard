@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>債務日曆</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 與 watch.html 同一套色票 */
+  :root{
+    --bg:#0B1220; --panel:#111B2D; --panel2:#0E1626; --line:#1E2A40;
+    --ink:#D9E2EF; --muted:#7E8CA3; --faint:#4A5670;
+    --teal:#3FB8AF; --amber:#E0A458; --red:#E2606B; --blue:#5B8DD9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    font-size:14px;line-height:1.55;padding:24px max(16px,4vw) 60px}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  a{color:var(--blue)}
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;margin-bottom:4px}
+  h1{font-size:20px;font-weight:700;letter-spacing:.04em}
+  nav{margin-left:auto;font-size:12px;display:flex;gap:14px}
+  nav a{color:var(--muted);text-decoration:none} nav a:hover{color:var(--ink)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px;min-width:0}
+  .box h2{font-size:11px;color:var(--muted);letter-spacing:.1em;font-weight:500;margin-bottom:10px}
+
+  /* 下一個事件 */
+  #next{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline}
+  #next .n{font-size:28px;font-weight:600;color:var(--amber)}
+  #next .t{font-size:15px;font-weight:500}
+  #next .c{font-size:12px;color:var(--muted);flex-basis:100%}
+
+  /* 時間軸 */
+  .tl{position:relative}
+  .tl .axis{position:relative;height:20px;margin-left:var(--lab);border-bottom:1px solid var(--line)}
+  .tl .tick{position:absolute;top:0;font-size:11px;color:var(--muted);transform:translateX(-50%)}
+  .tl .row{display:grid;grid-template-columns:var(--lab) 1fr;align-items:center;height:26px}
+  .tl .lab{font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+  .tl .track{position:relative;height:100%;border-bottom:1px dashed var(--panel2)}
+  .tl .bar{position:absolute;top:8px;height:10px;border-radius:5px;background:rgba(91,141,217,.22);border:1px solid var(--blue)}
+  .tl .dot{position:absolute;top:7px;width:12px;height:12px;transform:translateX(-50%) rotate(45deg);background:var(--muted)}
+  .tl .hot .bar{background:rgba(224,164,88,.22);border-color:var(--amber)}
+  .tl .hot .dot{background:var(--amber)}
+  .tl .past{opacity:.35}
+  .tl .today{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--teal)}
+  .tl{--lab:200px}
+  @media (max-width:640px){ .tl{--lab:110px} }
+
+  /* 事件表 */
+  .tbl{width:100%;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+  th{text-align:left;font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr.past td{color:var(--faint)}
+  tr.hot td:nth-child(3){color:var(--amber)}
+  .st{font-size:12px;white-space:nowrap}
+  .st.now{color:var(--teal)} .st.soon{color:var(--amber)}
+  .tag{display:inline-block;font-size:11px;padding:0 6px;border:1px solid var(--line);border-radius:4px;color:var(--muted)}
+  .approx{color:var(--faint);font-size:11px}
+  .links{font-size:12px;display:flex;flex-wrap:wrap;gap:14px}
+  footer{margin-top:20px;color:var(--faint);font-size:11px}
+  #err{display:none;color:var(--amber);font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>美債流動性與債務日曆</h1>
+  <nav><a href="watch.html">每日觀察</a><a href="index.html">流動性供需</a><a href="cycle.html">週期</a></nav>
+</header>
+<p class="sub" id="note">載入中…</p>
+<div id="err">讀不到 calendar_events.json。</div>
+
+<div class="box"><h2>下一個事件</h2><div id="next"></div></div>
+
+<div class="box"><h2>時間軸（虛線＝今天；琥珀＝債務上限）</h2><div class="tl" id="tl"></div></div>
+
+<div class="box"><h2>全部事件與當天檢查</h2><div class="tbl"><table>
+  <thead><tr><th>日期（台灣）</th><th>狀態</th><th>事件</th><th>預期影響</th><th>當天檢查</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table></div></div>
+
+<div class="box"><h2>連結</h2><div class="links">
+  <a href="calendar.ics" download>下載 .ics（加入手機行事曆）</a>
+  <a id="doc" href="#" target="_blank" rel="noopener">完整解讀文件</a>
+  <a href="https://home.treasury.gov/policy-issues/financing-the-government/quarterly-refunding/most-recent-quarterly-refunding-documents" target="_blank" rel="noopener">財政部 QRA 文件</a>
+  <a href="https://fiscaldata.treasury.gov/datasets/daily-treasury-statement/" target="_blank" rel="noopener">每日公庫對帳單 DTS（TGA）</a>
+  <a href="https://www.newyorkfed.org/markets/desk-operations/repo" target="_blank" rel="noopener">紐約 Fed SRF 操作結果</a>
+</div></div>
+
+<footer>事件清單在 docs/calendar_events.json，下一次 QRA（2027/2/3）後更新；改完 JSON 後執行 python make_calendar_ics.py 重新產生 .ics。本頁只是觀察工具，不構成投資建議。</footer>
+
+<script>
+function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+const DAY=864e5, tday=s=>Date.parse(s+"T00:00:00");
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function render(J){
+  const now=new Date(); now.setHours(0,0,0,0); const T=iso(now);
+  document.getElementById("note").textContent = J.note + "　清單更新：" + J.updated;
+  if(J.doc) document.getElementById("doc").href = J.doc;
+  const ev = J.events.slice().sort((a,b)=>a.d.localeCompare(b.d));
+  const status = e => {
+    const last = e.end || e.d;
+    if(last < T) return {k:"past", s:"已過"};
+    if(e.d <= T) return {k:"now", s:e.end?"進行中":"今天"};
+    const n = Math.round((tday(e.d)-now)/DAY);
+    return {k:n<=14?"soon":"", s:n+" 天後"};
+  };
+
+  // 下一個事件
+  const up = ev.filter(e=>e.d>=T).sort((a,b)=>a.d.localeCompare(b.d));
+  const cur = ev.filter(e=>e.end && e.d<=T && e.end>=T);
+  const nx = up[0];
+  document.getElementById("next").innerHTML = nx
+    ? `<span class="n mono">${Math.round((tday(nx.d)-now)/DAY)} 天</span><span class="t">${esc(nx.t)}${nx.approx?' <span class="approx">約</span>':""}</span><span class="c">${nx.d.replace(/-/g,"/")}｜檢查：${esc(nx.check)}${cur.length?"｜進行中："+cur.map(e=>esc(e.t)).join("、"):""}</span>`
+    : '<span class="c">清單內已沒有未來事件，請更新 calendar_events.json。</span>';
+
+  // 時間軸：固定 2026/11 – 2028/3
+  const lo=tday("2026-11-01"), hi=tday("2028-03-01"), P=d=>((tday(d)-lo)/(hi-lo)*100).toFixed(2)+"%";
+  let ticks="";
+  for(let m=10;m<=25;m+=3){ const y=2026+Math.floor(m/12), mm=m%12+1, d=`${y}-${String(mm).padStart(2,"0")}-01`; ticks+=`<span class="tick mono" style="left:${P(d)}">${y}/${mm}</span>`; }
+  const todayLine = (T>="2026-11-01" && T<"2028-03-01") ? `<span class="today" style="left:${P(T)}"></span>` : "";
+  document.getElementById("tl").innerHTML = `<div class="axis">${ticks}</div>` + ev.map(e=>{
+    const st=status(e);
+    const mark = e.end ? `<span class="bar" style="left:${P(e.d)};width:calc(${P(e.end)} - ${P(e.d)})"></span>` : `<span class="dot" style="left:${P(e.d)}"></span>`;
+    return `<div class="row${e.hot?" hot":""}${st.k==="past"?" past":""}" title="${esc(e.d+(e.end?" – "+e.end:"")+"："+e.t)}"><span class="lab">${esc(e.t)}</span><span class="track">${mark}${todayLine}</span></div>`;
+  }).join("");
+
+  // 表格
+  document.getElementById("rows").innerHTML = ev.map(e=>{
+    const st=status(e);
+    const date = e.d.replace(/-/g,"/") + (e.end ? " – " + e.end.slice(5).replace("-","/") : "");
+    return `<tr class="${st.k==="past"?"past":""}${e.hot?" hot":""}"><td class="mono">${date}</td><td><span class="st ${st.k}">${st.s}</span></td><td>${esc(e.t)}${e.approx?' <span class="approx">約</span>':""} <span class="tag">${esc(e.tag)}</span></td><td>${esc(e.impact)}</td><td>${esc(e.check)}</td></tr>`;
+  }).join("");
+}
+
+fetch("calendar_events.json",{cache:"no-store"}).then(r=>{ if(!r.ok) throw 0; return r.json(); })
+  .then(render).catch(()=>{ document.getElementById("err").style.display="block"; document.getElementById("note").textContent=""; });
+</script>
+</body>
+</html>
