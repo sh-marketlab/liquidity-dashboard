@@ -1,6 +1,6 @@
 """
 每日觀察儀表板 - 數據抓取與燈號判斷
-來源: FRED (FRED_API_KEY)、Yahoo Finance (MOVE、USD/TWD)、CNN Fear & Greed、證交所
+來源: FRED (FRED_API_KEY)、Yahoo Finance (MOVE、USD/TWD)、CNN Fear & Greed、證交所、ICI (MMF)
 輸出: docs/watch_data.json  →  docs/watch.html 讀取
 
 調整門檻: 只要改下面 RULES 區塊的數字即可 (GitHub 網頁上直接編輯)。
@@ -8,6 +8,7 @@
 """
 import json
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -92,6 +93,39 @@ def cnn_fear_greed():
         d = datetime.fromtimestamp(p["x"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
         out.append([d, round(float(p["y"]), 1)])
     return out
+
+
+MMF_HISTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "mmf_history.json")
+
+
+def ici_mmf():
+    """ICI 每週貨幣市場基金總資產 (十億美元)。
+    ICI 沒有免費 API：讀官網首段「$X trillion for the week ended …」，
+    每週存進 docs/mmf_history.json 累積成走勢 (第一次只有一個點)。"""
+    try:
+        with open(MMF_HISTORY, encoding="utf-8") as fh:
+            hist = json.load(fh)
+    except (OSError, ValueError):
+        hist = []
+    html = http_get("https://www.ici.org/research/stats/mmf")
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"&nbsp;|\s+", " ", text)
+    m = re.search(r"\$\s?([\d.,]+)\s*trillion[^$]{0,120}?week ended\s+(?:[A-Z][a-z]+day,?\s+)?([A-Z][a-z]+)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?", text)
+    if not m:
+        raise ValueError("ICI 頁面格式改變，找不到總資產句子")
+    val = round(float(m.group(1).replace(",", "")) * 1000, 1)
+    mon = datetime.strptime(m.group(2)[:3], "%b").month
+    yr = int(m.group(4)) if m.group(4) else TODAY.year
+    dd = date(yr, mon, int(m.group(3)))
+    if dd > TODAY + timedelta(days=7):   # 年初讀到去年 12 月的數字
+        dd = date(yr - 1, mon, int(m.group(3)))
+    d = dd.isoformat()
+    hist = [x for x in hist if x[0] != d] + [[d, val]]
+    hist.sort(key=lambda x: x[0])
+    hist = hist[-260:]
+    with open(MMF_HISTORY, "w", encoding="utf-8") as fh:
+        json.dump(hist, fh)
+    return hist
 
 
 def _num(s):
@@ -263,6 +297,7 @@ def main():
     dxy_s = safe("DXY", yahoo, "DX-Y.NYB")
     twd = safe("USD/TWD", yahoo, "TWD=X") or f["DEXTAUS"]
     fg = safe("Fear & Greed", cnn_fear_greed)
+    mmf = safe("MMF", ici_mmf)
     foreign, margin = twse_foreign_and_margin()
     print(f"  證交所: 外資 {len(foreign)} 天, 融資 {len(margin)} 天")
 
@@ -354,6 +389,12 @@ def main():
         "上升＝從市場抽水", "對照稅務日", "FRED WDTGAL", "4 週", chg(f["WDTGAL"], 4), 0))
     out.append(ind("rrp", "weekly", "ON RRP 隔夜逆回購", f["WLRRAL"], "百萬美元", "info",
         "接近零代表緩衝已用完", "", "FRED WLRRAL", "4 週", chg(f["WLRRAL"], 4), 0))
+
+    mc = chg(mmf, 4) if len(mmf) > 4 else None
+    out.append(ind("mmf", "weekly", "MMF 貨幣基金總資產", mmf, "十億美元", "info",
+        "與 RRP、淨流動性一起看", "MMF 增加而 RRP 沒增加＝錢停在 T-bill；MMF 大減＝資金流回風險資產或被提領",
+        "ICI 每週四公布", "4 週", mc, 0,
+        note=None if len(mmf) > 4 else f"歷史累積中（目前 {len(mmf)} 週）"))
 
     sf = f["STLFSI4"]
     c = chg(sf, 4)
