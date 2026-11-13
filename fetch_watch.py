@@ -107,10 +107,14 @@ def ici_mmf():
             hist = json.load(fh)
     except (OSError, ValueError):
         hist = []
-    html = http_get("https://www.ici.org/research/stats/mmf")
+    html = http_get("https://www.ici.org/research/stats/mmf", {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.ici.org/research/stats",
+    })
     text = re.sub(r"<[^>]+>", " ", html)
     text = re.sub(r"&nbsp;|\s+", " ", text)
-    m = re.search(r"\$\s?([\d.,]+)\s*trillion[^$]{0,120}?week ended\s+(?:[A-Z][a-z]+day,?\s+)?([A-Z][a-z]+)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?", text)
+    m = re.search(r"\$\s?([\d.,]+)\s*trillion[^$]{0,120}?(?:week|period) ended\s+(?:[A-Z][a-z]+day,?\s+)?([A-Z][a-z]+)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?", text)
     if not m:
         raise ValueError("ICI 頁面格式改變，找不到總資產句子")
     val = round(float(m.group(1).replace(",", "")) * 1000, 1)
@@ -298,6 +302,10 @@ def main():
     twd = safe("USD/TWD", yahoo, "TWD=X") or f["DEXTAUS"]
     fg = safe("Fear & Greed", cnn_fear_greed)
     mmf = safe("MMF", ici_mmf)
+    mmf_src = "ICI 每週四公布"
+    if not mmf:   # ICI 擋 GitHub 主機時，改用 FRED 的零售 MMF (ICI 提供給 Fed，約落後 3 週)
+        mmf = safe("MMF 備援 WRMFNS", fred, "WRMFNS")
+        mmf_src = "FRED WRMFNS（僅零售，ICI 抓不到時的備援）"
     foreign, margin = twse_foreign_and_margin()
     print(f"  證交所: 外資 {len(foreign)} 天, 融資 {len(margin)} 天")
 
@@ -391,9 +399,9 @@ def main():
         "接近零代表緩衝已用完", "", "FRED WLRRAL", "4 週", chg(f["WLRRAL"], 4), 0))
 
     mc = chg(mmf, 4) if len(mmf) > 4 else None
-    out.append(ind("mmf", "weekly", "MMF 貨幣基金總資產", mmf, "十億美元", "info",
+    out.append(ind("mmf", "weekly", "MMF 貨幣基金總資產" if mmf_src.startswith("ICI") else "MMF 零售貨幣基金", mmf, "十億美元", "info",
         "與 RRP、淨流動性一起看", "MMF 增加而 RRP 沒增加＝錢停在 T-bill；MMF 大減＝資金流回風險資產或被提領",
-        "ICI 每週四公布", "4 週", mc, 0,
+        mmf_src, "4 週", mc, 0,
         note=None if len(mmf) > 4 else f"歷史累積中（目前 {len(mmf)} 週）"))
 
     sf = f["STLFSI4"]
