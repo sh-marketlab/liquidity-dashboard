@@ -85,6 +85,11 @@
   .s-alert .rule .a{color:var(--red)} .s-watch .rule .a{color:var(--amber)}
   .rule .nt{color:var(--faint);font-size:11px}
 
+  details.silent{margin-top:26px}
+  details.silent summary{cursor:pointer;font-size:13px;letter-spacing:.14em;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:8px}
+  details.silent summary span{font-size:11px;letter-spacing:.04em;color:var(--faint);margin-left:10px}
+  details.silent summary .lit{color:var(--amber)}
+  details.silent h3{font-size:11px;color:var(--faint);font-weight:500;letter-spacing:.1em;margin:14px 0 2px}
   .manual{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:10px}
   .manual a{display:block;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-size:13px;color:var(--ink);text-decoration:none}
   .manual a:hover{border-color:var(--blue)}
@@ -110,7 +115,7 @@
   <span id="updated" class="mono">載入中…</span>
   <nav><a href="index.html">流動性供需</a><a href="cycle.html">週期</a><a href="calendar.html">債務日曆</a></nav>
 </header>
-<p class="sub">判讀順序：階段 → 需要注意 → 未來兩週行事曆 → 有燈號的指標。綠＝正常、黃＝留意、紅＝觸發動作、空心＝只看趨勢。門檻在 fetch_watch.py 的 RULES 調整。</p>
+<p class="sub">每天只看「每日核心」3 個；每週五早上（H.4.1 公布後）看每週 7 個；其餘收在靜默區，亮燈才會出現在「需要注意」。綠＝正常、黃＝留意、紅＝觸發動作、空心＝只看趨勢。門檻在 fetch_watch.py 的 RULES 調整。</p>
 
 <div id="setup">尚未產生 watch_data.json。請到 Actions 手動執行一次 Update dashboard data。</div>
 
@@ -140,6 +145,9 @@
 <section>
   <h2 class="sec"><b>手動檢查</b><span>沒有免費 API 的項目，每週或每月點進去看</span></h2>
   <div class="manual">
+    <a href="https://yardeni.com/charts/us-stock-market/stock-market-technicals/margin-debt" target="_blank" rel="noopener">美股 Margin Debt<span>每月（FINRA 月中公布）｜散戶槓桿</span></a>
+    <a href="https://www.newyorkfed.org/markets/desk-operations/repo" target="_blank" rel="noopener">NY Fed Repo 操作<span>SOFR−IORB 亮燈時才查｜誰在借</span></a>
+    <a href="https://fred.stlouisfed.org/series/SOFRVOL" target="_blank" rel="noopener">SOFR 成交量<span>SOFR−IORB 亮燈時才查｜量是否跟著放大</span></a>
     <a href="https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html" target="_blank" rel="noopener">CME FedWatch<span>每日｜利率路徑預期，對照 2Y</span></a>
     <a href="https://www.worldgovernmentbonds.com/cds-historical-data/united-states/5-years/" target="_blank" rel="noopener">美國 5Y 主權 CDS<span>每週｜只看方向</span></a>
     <a href="http://openinsider.com/latest-cluster-buys" target="_blank" rel="noopener">OpenInsider 叢集買進<span>每週｜多位高管同期買進</span></a>
@@ -155,7 +163,7 @@
 </section>
 
 <footer>
-  資料來源：FRED（St. Louis Fed）、Yahoo Finance（MOVE、USD/TWD）、CNN Fear &amp; Greed、臺灣證券交易所。<br>
+  資料來源：FRED（St. Louis Fed）、Yahoo Finance（MOVE、USD/TWD）、CNN Fear &amp; Greed、ICI（MMF）、臺灣證券交易所。<br>
   FRED 部分序列有落後（廣義美元指數約一週、H.4.1 為週三數值於週四公布）。燈號門檻是起始值，用歷史資料回測後再調整。本頁只是觀察工具，不構成投資建議。
 </footer>
 
@@ -263,13 +271,15 @@ function spark(pts, status){
 }
 
 // ---------- 版面 ----------
-const GROUPS = [
-  ["daily","每日","自動提醒為主，有燈號才細看"],
-  ["weekly","每週","週四 H.4.1 公布後，週末一次看完"],
-  ["monthly","每月","發布當週看趨勢，不看單月"],
-  ["quarterly","每季","「條件變化」的真正數據"],
-  ["taiwan","台灣","匯率、外資、散戶槓桿"],
+// 核心視圖：只有這些指標固定顯示；其餘進靜默區（資料照抓，亮燈才浮上來）
+// 要把某個指標升回固定顯示，把它的 id 加進下面對應的清單即可
+const TIERS = [
+  ["每日核心","每天 2 分鐘：信用、恐慌、資金水管", ["hy","vix","sofr_iorb"]],
+  ["每週","週五早上 H.4.1 公布後一次看完", ["netliq","mmf","stlfsi","y2","curve","dxy","twd"]],
+  ["每月","發布當週看趨勢，不看單月", ["core_pce","sahm"]],
+  ["每季","「條件變化」的真正數據", ["sloos","term_premium"]],
 ];
+const GROUP_NAME = {daily:"每日",weekly:"每週",monthly:"每月",quarterly:"每季",taiwan:"台灣"};
 const LABEL = {ok:"正常",watch:"留意",alert:"觸發",info:"趨勢",na:"無資料"};
 
 function row(i){
@@ -305,11 +315,21 @@ function render(d){
     : '<div class="empty">今天沒有黃燈或紅燈。看完行事曆就可以關掉了。</div>';
 
   const na = d.indicators.filter(i=>i.status==="na").map(i=>i.name);
-  document.getElementById("groups").innerHTML = GROUPS.map(([g,t,sub])=>{
-    const items=d.indicators.filter(i=>i.group===g);
+  const byId = Object.fromEntries(d.indicators.map(i=>[i.id,i]));
+  const shown = new Set(TIERS.flatMap(t=>t[2]));
+  const core = TIERS.map(([t,sub,ids])=>{
+    const items=ids.map(id=>byId[id]).filter(Boolean);
     if(!items.length) return "";
     return `<section><h2 class="sec"><b>${t}</b><span>${sub}</span></h2>${items.map(row).join("")}</section>`;
-  }).join("") + (na.length?`<p class="sub" style="margin-top:12px">本次無資料：${na.join("、")}（來源暫時抓不到，下次更新會重試）</p>`:"");
+  }).join("");
+  const rest = d.indicators.filter(i=>!shown.has(i.id));
+  const lit = rest.filter(i=>i.status==="watch"||i.status==="alert");
+  const silent = rest.length ? `<details class="silent"${lit.length?" open":""}><summary>靜默區（${rest.length} 個）<span>資料照抓、照判燈號，平常不用看${lit.length?`｜<span class="lit">${lit.length} 個亮燈</span>`:""}</span></summary>${
+    Object.keys(GROUP_NAME).map(g=>{
+      const items=rest.filter(i=>i.group===g);
+      return items.length ? `<h3>${GROUP_NAME[g]}</h3>${items.map(row).join("")}` : "";
+    }).join("")}</details>` : "";
+  document.getElementById("groups").innerHTML = core + silent + (na.length?`<p class="sub" style="margin-top:12px">本次無資料：${na.join("、")}（來源暫時抓不到，下次更新會重試）</p>`:"");
 }
 
 renderCal();
