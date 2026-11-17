@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美債危機監控</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 與 watch.html 同一套色票：深藍底、青綠＝正常、琥珀＝留意、紅＝觸發、藍＝衰退型（反向） */
+  :root{
+    --bg:#0B1220; --panel:#111B2D; --panel2:#0E1626; --line:#1E2A40;
+    --ink:#D9E2EF; --muted:#7E8CA3; --faint:#4A5670;
+    --teal:#3FB8AF; --amber:#E0A458; --red:#E2606B; --blue:#5B8DD9;
+    /* 殖利率三條線（已用 dataviz 驗證器檢查：深色底、全配對通過） */
+    --s2y:#199e70; --s10y:#3987e5; --s30y:#d95926;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    font-size:14px;line-height:1.6;padding:24px max(16px,4vw) 60px}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  a{color:var(--blue)}
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;margin-bottom:4px}
+  h1{font-size:20px;font-weight:700;letter-spacing:.04em}
+  nav.top{margin-left:auto;font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
+  nav.top a{color:var(--muted);text-decoration:none} nav.top a:hover{color:var(--ink)}
+  #updated{color:var(--muted);font-size:12px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:12px}
+  nav.jump{position:sticky;top:0;z-index:5;background:rgba(11,18,32,.94);backdrop-filter:blur(4px);
+    display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;margin-bottom:14px;border-bottom:1px solid var(--line)}
+  nav.jump a{font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:14px;padding:3px 11px}
+  nav.jump a:hover{color:var(--ink);border-color:var(--blue)}
+  nav.jump a.learn{color:var(--blue);border-color:rgba(91,141,217,.5)}
+
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+  section{scroll-margin-top:52px}
+  h2.sec{font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:500;
+    border-bottom:1px solid var(--line);padding-bottom:8px;margin:30px 0 10px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  h2.sec b{color:var(--ink);font-size:15px;letter-spacing:.06em}
+  h2.sec span{font-size:11.5px;letter-spacing:.02em;color:var(--faint)}
+
+  /* 狀態 */
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--faint);flex:none;display:inline-block}
+  .s-ok .dot,.dot.s-ok{background:var(--teal)} .s-watch .dot,.dot.s-watch{background:var(--amber)}
+  .s-alert .dot,.dot.s-alert{background:var(--red)} .s-rev .dot,.dot.s-rev{background:var(--blue)}
+  .s-info .dot,.dot.s-info{background:transparent;border:1.5px solid var(--muted)}
+  .tag{font-size:11px;border-radius:3px;padding:0 6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .tag.s-ok{color:var(--teal);border-color:rgba(63,184,175,.45)} .tag.s-watch{color:var(--amber);border-color:rgba(224,164,88,.5)}
+  .tag.s-alert{color:var(--red);border-color:rgba(226,96,107,.55)} .tag.s-rev{color:var(--blue);border-color:rgba(91,141,217,.55)}
+
+  /* 總燈號 */
+  #hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px}
+  .light{display:flex;gap:16px;align-items:flex-start}
+  .bulbs{display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:22px;flex:none}
+  .bulb{width:22px;height:22px;border-radius:50%;background:#18233a;border:1px solid var(--line)}
+  .bulb.on.red{background:var(--red);box-shadow:0 0 14px rgba(226,96,107,.7)}
+  .bulb.on.yellow{background:var(--amber);box-shadow:0 0 14px rgba(224,164,88,.7)}
+  .bulb.on.green{background:var(--teal);box-shadow:0 0 14px rgba(63,184,175,.6)}
+  .bulb.on.blue{background:var(--blue);box-shadow:0 0 14px rgba(91,141,217,.7)}
+  #ov-name{font-size:19px;font-weight:700;margin-bottom:4px}
+  #ov-name.red{color:var(--red)} #ov-name.yellow{color:var(--amber)} #ov-name.green{color:var(--teal)} #ov-name.blue{color:var(--blue)}
+  #ov-act{font-size:14.5px;margin-bottom:8px}
+  .reasons{font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+  .reasons b{color:var(--ink);font-weight:500}
+  .recap h3{font-size:11px;color:var(--muted);letter-spacing:.1em;font-weight:500;margin-bottom:6px}
+  .recap ol{margin-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px}
+  .recap ol b{color:var(--amber);font-weight:500}
+  .recap .one{margin-top:10px;font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+
+  /* 五種形式 */
+  .forms{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+  .form{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0;display:flex;flex-direction:column;gap:7px}
+  .form.s-watch{border-color:rgba(224,164,88,.55)} .form.s-alert{border-color:rgba(226,96,107,.65);background:linear-gradient(180deg,rgba(226,96,107,.08),var(--panel) 60%)}
+  .form .hd{display:flex;gap:8px;align-items:center}
+  .form .no{font-size:18px;color:var(--faint);font-weight:700}
+  .form .ti{font-size:14px;font-weight:700;line-height:1.3}
+  .form .pl{font-size:12px;color:var(--muted)}
+  .imp{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;font-size:11px;text-align:center}
+  .imp div{background:var(--panel2);border-radius:3px;padding:3px 2px}
+  .imp div span{display:block;color:var(--faint);font-size:10px}
+  .imp .bad{color:var(--red)} .imp .mid{color:var(--amber)} .imp .good{color:var(--teal)} .imp .flat{color:var(--muted)}
+  .form .lit{font-size:11.5px;color:var(--amber)}
+  .form .lit.none{color:var(--faint)}
+
+  /* 指標列 */
+  h3.grp{font-size:12.5px;color:var(--ink);font-weight:500;margin:18px 0 2px;display:flex;gap:8px;align-items:center}
+  h3.grp small{color:var(--faint);font-weight:400;font-size:11.5px}
+  .row{display:grid;grid-template-columns:12px minmax(170px,1.4fr) 135px 150px 100px minmax(0,1.9fr);
+    gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--panel2)}
+  .row.s-watch{background:linear-gradient(90deg,rgba(224,164,88,.07),transparent 60%)}
+  .row.s-alert{background:linear-gradient(90deg,rgba(226,96,107,.10),transparent 60%)}
+  .row.s-rev{background:linear-gradient(90deg,rgba(91,141,217,.10),transparent 60%)}
+  .nm .n{font-size:13px;font-weight:500} .nm .w{font-size:11.5px;color:var(--muted)}
+  .val{text-align:right;font-size:15px;font-weight:600}
+  .val small{display:block;font-size:10.5px;color:var(--faint);font-weight:400}
+  .chg{text-align:right;font-size:12px;color:var(--muted)} .chg small{display:block;font-size:10.5px;color:var(--faint)}
+  svg.spark{width:150px;height:34px;display:block}
+  .rule{font-size:12px;color:var(--muted);min-width:0}
+  .rule .a{color:var(--ink)} .row.s-watch .rule .a{color:var(--amber)} .row.s-alert .rule .a{color:var(--red)} .row.s-rev .rule .a{color:var(--blue)}
+  .rule .y{display:block;font-size:11.5px;margin-top:2px}
+  .rule .nt{display:block;font-size:11.5px;color:var(--ink);margin-top:2px}
+  .rule .src{display:block;font-size:10.5px;color:var(--faint)}
+
+  /* 圖表 */
+  .charts{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px}
+  .chart{position:relative}
+  .chart h4{font-size:13px;font-weight:500;margin-bottom:2px}
+  .chart .cap{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-bottom:4px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+  .chart svg{width:100%;height:auto;display:block}
+  .tip{position:absolute;pointer-events:none;background:#0A1020;border:1px solid var(--line);border-radius:5px;
+    padding:6px 9px;font-size:12px;display:none;white-space:nowrap;z-index:3}
+  .tip .d{color:var(--muted);font-size:11px}
+  .tip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+  .range{display:flex;gap:4px;margin-left:auto}
+  .range button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;border-radius:4px;padding:2px 8px;cursor:pointer;font-family:inherit}
+  .range button.on{color:var(--ink);border-color:var(--blue)}
+
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;color:var(--muted);font-weight:500;font-size:11.5px;border-bottom:1px solid var(--line);padding:6px 8px}
+  td{padding:6px 8px;border-bottom:1px solid var(--panel2);vertical-align:top}
+  td.num,th.num{text-align:right}
+  tr.weak td{background:rgba(226,96,107,.07)} tr.weak td:first-child{box-shadow:inset 3px 0 var(--red)}
+  tr.soft td:first-child{box-shadow:inset 3px 0 var(--amber)}
+  .scroll{overflow-x:auto}
+
+  /* 黑天鵝 */
+  .swans{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+  .swan{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+  .swan.s-watch{border-color:rgba(224,164,88,.5)} .swan.s-alert{border-color:rgba(226,96,107,.65)}
+  .swan .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .swan .hd b{font-size:13.5px}
+  .swan p{font-size:12.5px;color:var(--muted)}
+  .swan .k{color:var(--faint);font-size:11px;letter-spacing:.06em}
+  .swan .note{font-size:12.5px;color:var(--ink);border-left:2px solid var(--line);padding-left:8px}
+  .swan .auto{font-size:11.5px;color:var(--muted)}
+  .swan .stale{color:var(--amber);font-size:11px}
+
+  /* 部位 */
+  .pos{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+  .pc .top{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .pc .sym{font-size:18px;font-weight:700} .pc .px{font-size:18px}
+  .pc .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:12px;color:var(--muted);margin:6px 0 10px}
+  .pc .kv b{display:block;color:var(--ink);font-size:14px;font-weight:600}
+  .neg{color:var(--red)!important} .pos-v{color:var(--teal)!important}
+
+  /* 教學區 */
+  #learn .box{margin-bottom:12px}
+  #learn h3{font-size:15px;margin-bottom:8px;display:flex;gap:8px;align-items:baseline}
+  #learn h3 .n{color:var(--blue);font-family:'IBM Plex Mono',monospace;font-size:13px}
+  #learn p,#learn li{font-size:13.5px;line-height:1.75}
+  #learn p+p{margin-top:8px}
+  #learn ul,#learn ol{margin:6px 0 0 20px;display:flex;flex-direction:column;gap:4px}
+  #learn .hl{color:var(--amber)}
+  #learn .em{background:rgba(91,141,217,.12);border-left:3px solid var(--blue);padding:8px 12px;border-radius:0 6px 6px 0;margin:10px 0;font-size:13.5px}
+  .three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .three > div{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+  .three b{display:block;margin-bottom:4px}
+  .flow{display:flex;flex-direction:column;align-items:center;gap:4px;margin:10px 0}
+  .flow .st{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-size:13px;max-width:560px;width:100%;text-align:center}
+  .flow .st.hot{border-color:rgba(226,96,107,.6)}
+  .flow .ar{color:var(--faint);font-size:14px;line-height:1}
+  .flow .loop{font-size:12px;color:var(--amber);border:1px dashed rgba(224,164,88,.5);border-radius:6px;padding:4px 10px}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+  .vs > div{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--panel2)}
+  .vs .t{font-weight:700;margin-bottom:4px}
+  .vs .good{color:var(--teal)} .vs .bad{color:var(--red)}
+  #err{display:none;background:var(--panel);border:1px dashed var(--amber);border-radius:8px;padding:16px;margin:12px 0;color:var(--amber);font-size:13px}
+  footer{margin-top:36px;color:var(--faint);font-size:11px;line-height:1.7}
+
+  @media (max-width:1100px){ .forms{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:860px){
+    #hero,.charts,.three,.vs{grid-template-columns:1fr}
+    .forms{grid-template-columns:1fr}
+    .row{grid-template-columns:12px minmax(0,1fr) auto;grid-template-areas:"d n v" "d s c" "d r r";row-gap:4px}
+    .row .dot{grid-area:d;align-self:start;margin-top:5px}
+    .row .nm{grid-area:n} .row .val{grid-area:v} .row .sp{grid-area:s} .row .chg{grid-area:c} .row .rule{grid-area:r}
+    svg.spark{width:100%;max-width:220px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>美債危機監控</h1>
+  <span id="updated" class="mono">載入中…</span>
+  <nav class="top"><a href="watch.html">每日觀察</a><a href="index.html">流動性供需</a><a href="cycle.html">週期</a><a href="calendar.html">債務日曆</a></nav>
+</header>
+<p class="sub">追蹤「美債崩潰」最可能發生的樣子：長期利率失控、標售沒人買、央行被迫印鈔、流動性崩跌、債務上限。每個工作日自動更新；黑天鵝清單在 <span class="mono">docs/treasury_manual.json</span> 手動更新；門檻在 <span class="mono">fetch_treasury.py</span> 的 RULES 調整。忘記邏輯時，直接看最下面的「底層邏輯」。</p>
+
+<nav class="jump">
+  <a href="#hero">總燈號</a><a href="#forms">五種爆發形式</a><a href="#ind">指標</a><a href="#charts">圖表</a>
+  <a href="#auctions">長債標售</a><a href="#swans">黑天鵝</a><a href="#pos">我的部位</a><a href="#learn" class="learn">📖 底層邏輯</a>
+</nav>
+
+<div id="err"></div>
+
+<!-- ============ 總燈號 ============ -->
+<section id="hero">
+  <div class="box light">
+    <div class="bulbs"><div class="bulb" id="b-red"></div><div class="bulb" id="b-yellow"></div><div class="bulb" id="b-green"></div><div class="bulb" id="b-blue" title="藍燈＝衰退型（反向訊號）"></div></div>
+    <div style="min-width:0">
+      <div id="ov-name">—</div>
+      <div id="ov-act"></div>
+      <div class="reasons" id="ov-why"></div>
+    </div>
+  </div>
+  <div class="box recap">
+    <h3>30 秒複習：要記住的三件事</h3>
+    <ol>
+      <li><b>殖利率升＝債券價格跌</b>（蹺蹺板）。期限越長跌越多：TLT 約是 IEF 的 2 倍多。</li>
+      <li>危機分兩型：<b>衰退型</b>（Fed 降息，TLT 漲）vs <b>財政信任崩潰型</b>（大家不信政府，TLT 跌）。看燈號是哪一型。</li>
+      <li>最危險的訊號：<b>股、債、美元同時跌</b>＝全世界在逃離美國資產。</li>
+    </ol>
+    <div class="one">一句話：美債「崩潰」比較可能的樣子是長期利率失控、通膨或美元貶值，而不是違約。</div>
+  </div>
+</section>
+
+<!-- ============ 五種形式 ============ -->
+<section id="forms">
+  <h2 class="sec"><b>五種可能的爆發形式</b><span>每張卡的燈號＝底下相關指標最嚴重的那個；格子是對短／中／長債的影響</span></h2>
+  <div class="forms" id="form-cards"></div>
+</section>
+
+<!-- ============ 指標 ============ -->
+<section id="ind">
+  <h2 class="sec"><b>追蹤指標</b><span>綠＝正常、黃＝留意、紅＝觸發、藍＝衰退型（對長債有利）、空心＝只看趨勢。每列下方有「這是什麼／為什麼重要」</span></h2>
+  <div id="rows"></div>
+</section>
+
+<!-- ============ 圖表 ============ -->
+<section id="charts">
+  <h2 class="sec"><b>圖表</b><span>滑鼠移上去看數值；虛線是燈號門檻</span></h2>
+  <div class="charts">
+    <div class="box chart" id="c-yields">
+      <div style="display:flex;align-items:baseline;gap:8px"><h4>2 年、10 年、30 年期殖利率（%）</h4>
+        <div class="range" data-for="yields"><button data-n="130">6 個月</button><button data-n="260" class="on">1 年</button><button data-n="520">2 年</button></div></div>
+      <div class="cap">30 年線往上衝、2 年線不動＝財政型；三條一起往下＝衰退型。</div>
+      <div class="legend"><span><i style="background:var(--s2y)"></i>2 年</span><span><i style="background:var(--s10y)"></i>10 年</span><span><i style="background:var(--s30y)"></i>30 年</span></div>
+      <div class="plot"></div><div class="tip"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div class="box chart" id="c-tp">
+        <h4>10 年期限溢酬（百分點）</h4>
+        <div class="cap">投資人額外要求的「擔心費」。越高＝越不放心長期借錢給政府。</div>
+        <div class="plot"></div><div class="tip"></div>
+      </div>
+      <div class="box chart" id="c-s530">
+        <h4>5 年－30 年利差（百分點）</h4>
+        <div class="cap">擴大＝長債被單獨拋售（要搭配股市一起看）。</div>
+        <div class="plot"></div><div class="tip"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 標售 ============ -->
+<section id="auctions">
+  <h2 class="sec"><b>長債標售（10／20／30 年）</b><span>與同天期前 6 場平均比較。紅條＝偏弱（倍數低於平均且交易商承接高於平均）；黃條＝其中一項偏弱。財政部資料沒有 WI 殖利率，無法計算尾差，以交易商承接代替</span></h2>
+  <div class="box scroll"><table id="auc-table"></table></div>
+</section>
+
+<!-- ============ 黑天鵝 ============ -->
+<section id="swans">
+  <h2 class="sec"><b>黑天鵝清單</b><span>手動狀態（改 docs/treasury_manual.json）＋自動代理指標。標「出場觸發」的項目變紅，總燈號直接升紅燈</span></h2>
+  <div class="swans" id="swan-cards"></div>
+</section>
+
+<!-- ============ 部位 ============ -->
+<section id="pos">
+  <h2 class="sec"><b>我的部位：TLT／IEF</b><span>「殖利率再升 X」的估算＝存續期間 × 變動（不含凸性，大幅變動時略高估跌幅）</span></h2>
+  <div class="pos" id="pos-cards"></div>
+</section>
+
+<!-- ============ 底層邏輯 ============ -->
+<section id="learn">
+  <h2 class="sec"><b>📖 底層邏輯</b><span>用國中生也懂的方式寫；忘記時從這裡重讀</span></h2>
+
+  <div class="box">
+    <h3><span class="n">01</span>原理：先搞懂三件事</h3>
+    <div class="three">
+      <div><b>① 國債＝政府寫的借條</b>政府花的錢比收的稅多，差額就靠發借條跟大家借。到期要還本金，平常要付利息。美國目前每年赤字約 2 兆美元，總債務超過 40 兆、約等於一整年的 GDP。</div>
+      <div><b>② 價格和殖利率像蹺蹺板</b>你有一張每年付 4 元利息的舊借條。市場上新借條每年付 5 元，就沒人想用原價買你的，你只能降價賣。<br><span class="hl">→ 利率上升，舊債券價格下跌。</span></div>
+      <div><b>③ 期限越長，蹺蹺板越用力</b>短債（3 個月～2 年）：影響很小。<br>中債 IEF（7～10 年）：殖利率漲 1%，價格約跌 7～8%。<br>長債 TLT（20～30 年）：殖利率漲 1%，價格約跌 16～17%。<br><span class="hl">這個「跌幾 %」叫存續期間。</span></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h3><span class="n">02</span>傳導路徑：危機怎麼一步步發生</h3>
+    <p>想成一個會<span class="hl">自己越轉越快</span>的惡性循環：</p>
+    <div class="flow">
+      <div class="st">赤字太大 → 政府要發更多借條</div><div class="ar">▼</div>
+      <div class="st">買家吃不下那麼多 → 要更高的利息才肯買（長期利率上升）</div><div class="ar">▼</div>
+      <div class="st hot">政府利息支出暴增 → 赤字更大 → 又要發更多借條</div>
+      <div class="loop">↺ 回到第一步，越轉越快</div><div class="ar">▼</div>
+      <div class="st">房貸、企業貸款利率跟著升 → 房市、股市、經濟受傷</div>
+    </div>
+    <p><b>關鍵是「期限溢價」（term premium）。</b>投資人借錢給政府 30 年、而不是一次只借 3 個月時，會額外要求一筆補償，就像「擔心費」。買 30 年長債，等於賭這個政府 30 年內都能管好財政；長債越發越多、買家還是同一群人，擔心費就會上升。</p>
+    <div class="em">短期利率是<b>老師（Fed）</b>決定的；長期利率是<b>全班同學（市場）</b>投票決定的。<br>所以就算 Fed 完全不升息，只要大家開始不信任政府，長期利率還是會自己漲上去。這不是「升息」造成的危機。</div>
+    <p>另一個燃料是「國債平均利率」：以前發的低利借條陸續到期，換成現在 4～5% 的新借條，政府的利息負擔就會一年比一年重（指標區有這條線）。</p>
+  </div>
+
+  <div class="box">
+    <h3><span class="n">03</span>五種爆發形式</h3>
+    <p>美國借的是美元，美元自己印得出來，所以<span class="hl">真正還不出錢（違約）的機率很低</span>。比較可能出現的是下面五種，對短、中、長債的影響都不一樣：</p>
+    <div class="scroll"><table>
+      <tr><th>形式</th><th>白話說明</th><th>短債</th><th>中債 IEF</th><th>長債 TLT</th></tr>
+      <tr><td><b>① 長債暴動</b><br><span style="color:var(--faint)">債券義警</span></td><td>投資人集體不買長債，30 年期殖利率暴衝。2022 年英國長債危機就是這樣。</td><td>穩定</td><td>跌</td><td style="color:var(--red)">大跌 ⚠️</td></tr>
+      <tr><td><b>② 標售失敗</b></td><td>政府拍賣新債，買家太少，只好用更高的利率賣出。</td><td>小影響</td><td>跌</td><td style="color:var(--red)">大跌</td></tr>
+      <tr><td><b>③ 財政主導</b><br><span style="color:var(--faint)">央行被迫印鈔</span></td><td>政府壓力太大，要求 Fed 買債壓低利率。帳面上債券不一定跌，但錢變薄（通膨）、美元貶值，實質購買力被偷走。</td><td>實質小損</td><td>實質損失</td><td style="color:var(--red)">實質大損</td></tr>
+      <tr><td><b>④ 流動性崩潰</b></td><td>市場恐慌時，連美債都被拋售換現金（2020 年 3 月、2025 年 4 月）。</td><td>短暫波動</td><td>急跌後反彈</td><td>急跌後反彈</td></tr>
+      <tr><td><b>⑤ 債務上限</b><br><span style="color:var(--faint)">技術性違約</span></td><td>國會沒有及時提高借錢上限，少數快到期的短債可能延遲付款。</td><td style="color:var(--red)">到期日附近受傷</td><td>可能上漲（避險）</td><td>可能上漲</td></tr>
+    </table></div>
+    <div class="em"><b>最危險的組合：股、債、美元三殺。</b>正常情況下股票跌，錢會躲進美債，美債就會漲。如果三樣同時跌，代表全世界在逃離美國資產，這是 ① 和 ③ 的典型樣子。</div>
+    <p><b>例外：衰退型危機。</b>如果崩盤原因是經濟衰退（例如 AI 泡沫破裂、企業倒閉），Fed 會降息、錢會湧進美債，TLT 反而大漲。這就是很多人持有 TLT 當保險的原因。</p>
+    <div class="vs">
+      <div><div class="t good">衰退型 → TLT 漲（藍燈）</div>失業率上升（沙姆法則 ≥ 0.5）、股市大跌、2 年期利率急降、Fed 降息。<br>長債是避風港，<b>不要恐慌賣出</b>。</div>
+      <div><div class="t bad">財政信任崩潰型 → TLT 跌（紅燈）</div>30 年期利率衝高、期限溢價上升、標售沒人買、股債匯三殺、通膨預期上升。<br>長債是風暴中心，<b>縮短存續期間</b>。</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h3><span class="n">04</span>要追蹤什麼（為什麼是這些）</h3>
+    <ul>
+      <li><b>30 年期殖利率</b>：財政信任的溫度計，TLT 的命脈。</li>
+      <li><b>10 年期殖利率</b>：房貸和企業借款的基準，IEF 的命脈。</li>
+      <li><b>期限溢價</b>：長期利率上漲是「經濟好」還是「不放心」？後者才是危機。</li>
+      <li><b>5 年－30 年利差＋股市</b>：長債是不是被單獨拋售。</li>
+      <li><b>股債匯是否同跌</b>：有沒有在逃離美國資產。</li>
+      <li><b>MOVE 指數</b>：債市恐慌程度，急升可能引發被迫賣債。</li>
+      <li><b>長債標售</b>：投標倍數（越低越沒人要）、交易商承接（越高越像硬吃）、間接投標（外資需求）。</li>
+      <li><b>5y5y 通膨預期＋金價對美元</b>：市場是否開始擔心央行用印鈔解決債務。</li>
+      <li><b>債務上限剩餘額度</b>：技術性違約的倒數計時。</li>
+      <li><b>財政部發債規劃（每季 Refunding）</b>：財政部刻意少發長債對 TLT 是支撐；如果改口大發長債就是警訊。（手動看，見債務日曆）</li>
+      <li><b>外國人持有美債（TIC 報告）</b>：日本、中國有沒有持續減持。（手動看，每月中公布）</li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <h3><span class="n">05</span>因應策略：紅綠燈出場規則</h3>
+    <p><b>先問自己為什麼持有 TLT。</b>如果是當衰退保險：這個功能在財政型危機中會失效，甚至跟股票一起跌。如果是為了領利息：要比較長債和短債的利差，看多冒的價格風險值不值得（部位區有即時數字）。</p>
+    <div class="scroll" style="margin-top:10px"><table>
+      <tr><th>燈號</th><th>條件（這頁自動判斷的就是這張表）</th><th>動作（參考）</th></tr>
+      <tr><td><span class="tag s-ok">🟢 綠燈</span></td><td>30 年期 &lt; <span data-r="y30.watch">5.5</span>%，標售正常，股債呈反向走勢</td><td>維持部位</td></tr>
+      <tr><td><span class="tag s-watch">🟡 黃燈</span></td><td>任一項：30 年期 ≥ <span data-r="y30.watch">5.5</span>%；長債標售連續 <span data-r="auction.watch">2</span> 場偏弱；期限溢價 ≥ <span data-r="term_prem.watch">1.3</span></td><td>先把 1/3 的 TLT 換成 IEF 或短債</td></tr>
+      <tr><td><span class="tag s-alert">🔴 紅燈</span></td><td>任一項：30 年期連續 <span data-r="y30.days">3</span> 天站上前高 <span data-r="y30.alert">5.73</span>%；股債匯三殺連續 <span data-r="triple.alert_days">3</span> 天；Fed 獨立性明確受損或開始財政性印鈔（黑天鵝清單手動標紅）</td><td><b>TLT 大部分出清</b>，轉入短債（SGOV、BIL）或抗通膨債 TIPS（SCHP）；IEF 減碼</td></tr>
+      <tr><td><span class="tag s-rev">🔵 藍燈</span></td><td>沙姆法則 ≥ <span data-r="recession.sahm">0.5</span>；或 S&amp;P 從高點跌 ≥ <span data-r="recession.spx_dd">15</span>% 且 2 年期一個月降 ≥ 0.5</td><td>衰退型，TLT 通常會漲：<b>不要恐慌賣出</b></td></tr>
+    </table></div>
+    <p style="margin-top:10px"><b>實用原則</b></p>
+    <ol>
+      <li><b>縮短存續期間是最直接的防守。</b>TLT → IEF 大約減掉一半的利率風險；IEF → 短債則幾乎沒有利率風險。</li>
+      <li><b>分批處理</b>，不要一次全進或全出；長債波動大，常常會反向急彈。</li>
+      <li><b>注意台幣的雙重風險。</b>如果發生「逃離美國資產」，美債跌的同時美元也會貶，以台幣計價是雙重損失。</li>
+      <li><b>槓鈴配置</b>（一端短債、一端少量長債）通常比全部放在中長債有彈性：兩種危機都能部分照顧到。</li>
+      <li><b>債務上限前後</b>（約 2027 年 2 月），避開到期日剛好落在那段期間的短期國庫券。</li>
+    </ol>
+    <div class="em">紅綠燈是幫你「不用每次重想」的紀律工具，不是預言。門檻是起始值，用一段時間後依自己的經驗在 RULES 調整（上表數字會自動跟著改）。燈號只提醒，最後的判斷仍要自己做。</div>
+  </div>
+</section>
+
+<footer>
+  資料：FRED（DGS2/5/10/30、THREEFYTP10、T5YIFR、SAHMREALTIME、IRLTLT01JPM156N）、Yahoo Finance（^GSPC、TLT、IEF、DX-Y.NYB、^MOVE、GC=F、CL=F、TWD=X）、財政部 FiscalData（標售、DTS 債務上限、平均利率）。<br>
+  <span id="src-err"></span>
+</footer>
+
+<script>
+const LABEL = {ok:"正常",watch:"留意",alert:"觸發",info:"趨勢",rev:"衰退型",na:"無資料"};
+const FORMS = [
+  {id:"f1",no:"①",t:"長債暴動",p:"投資人集體不買長債，30 年期殖利率暴衝",imp:[["短債","穩定","flat"],["IEF","跌","mid"],["TLT","大跌","bad"]]},
+  {id:"f2",no:"②",t:"標售失敗",p:"拍賣新債買家太少，只好提高利率",imp:[["短債","小影響","flat"],["IEF","跌","mid"],["TLT","大跌","bad"]]},
+  {id:"f3",no:"③",t:"財政主導",p:"Fed 被迫印鈔幫政府，錢變薄、美元貶",imp:[["短債","實質小損","mid"],["IEF","實質損","mid"],["TLT","實質大損","bad"]]},
+  {id:"f4",no:"④",t:"流動性崩潰",p:"恐慌時連美債都被賣掉換現金",imp:[["短債","短暫波動","flat"],["IEF","急跌反彈","mid"],["TLT","急跌反彈","mid"]]},
+  {id:"f5",no:"⑤",t:"債務上限",p:"國會沒提高上限，快到期短債延遲付款",imp:[["短債","到期日受傷","bad"],["IEF","可能漲","good"],["TLT","可能漲","good"]]},
+];
+const GROUPS = [
+  ["① 長債暴動","財政信任的核心指標",["y30","y10","term_prem","steepen","triple","avg_rate","jgb"]],
+  ["② 標售失敗","買家是否在罷工（明細見下方標售表）",["auction"]],
+  ["③ 財政主導","錢會不會變薄",["breakeven","gold_dxy","oil"]],
+  ["④ 流動性崩潰","恐慌時的被迫賣壓",["move","liq_crash"]],
+  ["⑤ 債務上限","技術性違約倒數",["debt_room"]],
+  ["🔵 反向訊號：衰退型","亮藍燈時 TLT 通常受惠",["sahm","y2"]],
+];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = (v,d=2) => v==null||isNaN(v) ? "—" : Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn = (v,d=2) => v==null ? "—" : (v>0?"+":"")+fmt(v,d);
+
+function spark(pts, status){
+  if(!pts || pts.length<2) return '<svg class="spark" viewBox="0 0 150 34"></svg>';
+  const W=150,H=34,P=3, ys=pts.map(p=>p[1]); let lo=Math.min(...ys), hi=Math.max(...ys); if(hi===lo){hi+=1;lo-=1;}
+  const x=k=>P+(W-2*P)*k/(pts.length-1), y=v=>H-P-(H-2*P)*(v-lo)/(hi-lo);
+  const line=pts.map((p,k)=>(k?"L":"M")+x(k).toFixed(1)+" "+y(p[1]).toFixed(1)).join(" ");
+  const col={ok:"var(--teal)",watch:"var(--amber)",alert:"var(--red)",rev:"var(--blue)"}[status]||"var(--muted)";
+  const lx=x(pts.length-1), ly=y(ys[ys.length-1]);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <path d="${line} L${lx.toFixed(1)} ${H-P} L${P} ${H-P} Z" fill="${col}" opacity=".12"/>
+    <path d="${line}" fill="none" stroke="${col}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.4" fill="${col}"/></svg>`;
+}
+
+// ---------- 折線圖（含十字線提示） ----------
+function lineChart(el, series, opts={}){
+  const plot=el.querySelector(".plot"), tip=el.querySelector(".tip");
+  const W=Math.max(300,Math.round(plot.clientWidth||720)), H=opts.h||260, L=40, R=opts.labels?54:14, T=10, B=24;
+  series=series.filter(s=>s.pts&&s.pts.length>1);
+  if(!series.length){plot.innerHTML='<div style="color:var(--muted);font-size:12px;padding:20px 0">無資料</div>';return;}
+  const dates=[...new Set(series.flatMap(s=>s.pts.map(p=>p[0])))].sort();
+  const di=Object.fromEntries(dates.map((d,i)=>[d,i]));
+  const all=series.flatMap(s=>s.pts.map(p=>p[1])).concat((opts.th||[]).map(t=>t.v));
+  let lo=Math.min(...all), hi=Math.max(...all); const pad=(hi-lo)*.08||.1; lo-=pad; hi+=pad;
+  const x=i=>L+(W-L-R)*i/Math.max(1,dates.length-1), y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  const step=(hi-lo)>2?.5:(hi-lo)>1?.25:(hi-lo)>.4?.1:.05;
+  let g="";
+  for(let v=Math.ceil(lo/step)*step; v<=hi; v+=step){
+    g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/>
+        <text x="${L-6}" y="${y(v)+4}" fill="var(--faint)" font-size="10" text-anchor="end" font-family="IBM Plex Mono">${v.toFixed(2)}</text>`;
+  }
+  const nT=5; for(let k=0;k<nT;k++){const i=Math.round((dates.length-1)*k/(nT-1));
+    g+=`<text x="${x(i)}" y="${H-6}" fill="var(--faint)" font-size="10" text-anchor="${k==0?'start':k==nT-1?'end':'middle'}" font-family="IBM Plex Mono">${dates[i].slice(0,7)}</text>`;}
+  for(const t of opts.th||[]){ if(t.v<lo||t.v>hi) continue;
+    g+=`<line x1="${L}" x2="${W-R}" y1="${y(t.v)}" y2="${y(t.v)}" stroke="${t.c}" stroke-width="1" stroke-dasharray="4 4" opacity=".8"/>
+        <text x="${L+4}" y="${y(t.v)-4}" fill="${t.c}" font-size="10">${esc(t.label)}</text>`;}
+  for(const s of series){
+    const d=s.pts.map((p,k)=>(k?"L":"M")+x(di[p[0]]).toFixed(1)+" "+y(p[1]).toFixed(1)).join(" ");
+    g+=`<path d="${d}" fill="none" stroke="${s.c}" stroke-width="2" stroke-linejoin="round"/>`;
+    const lp=s.pts[s.pts.length-1];
+    g+=`<circle cx="${x(di[lp[0]])}" cy="${y(lp[1])}" r="3" fill="${s.c}" stroke="var(--panel)" stroke-width="2"/>`;
+    if(opts.labels) g+=`<text x="${x(di[lp[0]])+7}" y="${y(lp[1])+4}" fill="var(--ink)" font-size="11" font-family="IBM Plex Mono">${esc(s.n)} ${lp[1].toFixed(2)}</text>`;
+  }
+  g+=`<line class="xh" x1="0" x2="0" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-width="1" opacity="0"/>`;
+  plot.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria||'')}">${g}<rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/></svg>`;
+  const svg=plot.querySelector("svg"), xh=svg.querySelector(".xh");
+  const maps=series.map(s=>Object.fromEntries(s.pts));
+  svg.addEventListener("mousemove",e=>{
+    const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)/r.width*W;
+    const i=Math.max(0,Math.min(dates.length-1,Math.round((px-L)/(W-L-R)*(dates.length-1)))), d=dates[i];
+    xh.setAttribute("x1",x(i));xh.setAttribute("x2",x(i));xh.setAttribute("opacity",".6");
+    tip.innerHTML=`<div class="d">${d}</div>`+series.map((s,k)=>maps[k][d]!=null?`<div><i style="background:${s.c}"></i>${esc(s.n)} <span class="mono">${maps[k][d].toFixed(2)}</span></div>`:"").join("");
+    tip.style.display="block";
+    const pr=el.getBoundingClientRect(), left=e.clientX-pr.left+14;
+    tip.style.left=Math.min(left, pr.width-tip.offsetWidth-8)+"px"; tip.style.top=(e.clientY-pr.top-10)+"px";
+  });
+  svg.addEventListener("mouseleave",()=>{tip.style.display="none";xh.setAttribute("opacity","0");});
+}
+
+// ---------- 渲染 ----------
+let DATA=null, MANUAL=null, yieldsN=260;
+
+function setOverall(){
+  const ov={...DATA.overall, reasons:[...(DATA.overall.reasons||[])]};
+  // 手動黑天鵝：出場觸發項目標紅 → 總燈號直接升紅
+  const trig=(MANUAL?.items||[]).filter(i=>i.exit_trigger && i.level==="red");
+  if(trig.length && ov.level!=="red"){
+    ov.level="red"; ov.name="紅燈：財政信任崩潰型（黑天鵝手動觸發）";
+    ov.action="TLT 大部分出清，轉入短債（SGOV、BIL）或抗通膨債 TIPS（SCHP）；IEF 減碼。分批執行。";
+  }
+  trig.forEach(i=>ov.reasons.unshift(`黑天鵝：${i.name}${i.note?"（"+i.note+"）":""}`));
+  ["red","yellow","green","blue"].forEach(c=>document.getElementById("b-"+c).className="bulb"+(c===ov.level?" on "+c:""));
+  const nm=document.getElementById("ov-name"); nm.textContent=ov.name; nm.className=ov.level;
+  document.getElementById("ov-act").textContent=ov.action;
+  let h="";
+  if(ov.reasons.length) h+=ov.reasons.map(r=>`<div>・<b>${esc(r)}</b></div>`).join("");
+  else h+=`<div>出場規則表的條件都沒有觸發。</div>`;
+  if(ov.level!=="blue" && ov.recession?.length) h+=`<div style="color:var(--blue)">・同時出現衰退型訊號：${esc(ov.recession.join("；"))}</div>`;
+  if(ov.other?.length) h+=`<div style="margin-top:4px">其他亮燈（不改變總燈號）：${esc(ov.other.join("、"))}</div>`;
+  document.getElementById("ov-why").innerHTML=h;
+}
+
+function renderForms(){
+  const byId=Object.fromEntries(DATA.indicators.map(i=>[i.id,i]));
+  const manualBy={}; (MANUAL?.items||[]).forEach(m=>(m.forms||[]).forEach(f=>(manualBy[f]=manualBy[f]||[]).push(m)));
+  const lvMap={green:"ok",yellow:"watch",red:"alert"}, ord={na:-1,ok:0,info:0,watch:1,alert:2};
+  document.getElementById("form-cards").innerHTML=FORMS.map(f=>{
+    const fd=DATA.forms[f.id]||{status:"na",lit:[]};
+    let st=fd.status, lit=[...(fd.lit||[])];
+    (manualBy[f.id]||[]).forEach(m=>{const s=lvMap[m.level]||"ok"; if(s!=="ok") lit.push("黑天鵝："+m.name); if(ord[s]>ord[st]) st=s;});
+    return `<div class="form s-${st}">
+      <div class="hd"><span class="no">${f.no}</span><span class="dot s-${st}"></span><span class="ti">${f.t}</span><span class="tag s-${st}" style="margin-left:auto">${LABEL[st]}</span></div>
+      <div class="pl">${f.p}</div>
+      <div class="imp">${f.imp.map(([a,b,c])=>`<div><span>${a}</span><b class="${c}">${b}</b></div>`).join("")}</div>
+      <div class="lit ${lit.length?"":"none"}">${lit.length?"亮燈："+esc(lit.join("、")):"相關指標都正常"}</div>
+    </div>`;}).join("");
+}
+
+function renderRows(){
+  const byId=Object.fromEntries(DATA.indicators.map(i=>[i.id,i]));
+  let h="";
+  for(const [g,sub,ids] of GROUPS){
+    h+=`<h3 class="grp">${g}<small>${sub}</small></h3>`;
+    for(const id of ids){ const i=byId[id]; if(!i) continue;
+      const st=i.status||"na";
+      h+=`<div class="row s-${st}">
+        <span class="dot"></span>
+        <div class="nm"><div class="n">${esc(i.name)}</div><div class="w">${esc(i.what)}</div></div>
+        <div class="val mono">${fmt(i.value,i.digits)}<small>${esc(i.unit)}${i.date?" · "+i.date:""}</small></div>
+        <div class="sp">${spark(i.spark,st)}</div>
+        <div class="chg mono">${i.chg_label?`${sgn(i.chg,i.digits)}<small>${esc(i.chg_label)}</small>`:""}</div>
+        <div class="rule"><span class="a">${LABEL[st]}</span>${i.rule?"・"+esc(i.rule):""}
+          ${i.note?`<span class="nt">${esc(i.note)}</span>`:""}
+          <span class="y">為什麼重要：${esc(i.why)}</span>
+          <span class="src">${esc(i.source)}</span></div>
+      </div>`;
+    }
+  }
+  document.getElementById("rows").innerHTML=h;
+}
+
+function renderCharts(){
+  const c=DATA.charts, r=DATA.rules, n=yieldsN;
+  lineChart(document.getElementById("c-yields"),[
+    {n:"2Y",c:"var(--s2y)",pts:(c.y2||[]).slice(-n)},
+    {n:"10Y",c:"var(--s10y)",pts:(c.y10||[]).slice(-n)},
+    {n:"30Y",c:"var(--s30y)",pts:(c.y30||[]).slice(-n)}],
+    {labels:true,h:360,aria:"2、10、30 年期殖利率",th:[{v:r.y30.alert,c:"var(--red)",label:`30Y 紅燈 ${r.y30.alert}%`},{v:r.y30.watch,c:"var(--amber)",label:`30Y 黃燈 ${r.y30.watch}%`}]});
+  lineChart(document.getElementById("c-tp"),[{n:"期限溢酬",c:"var(--s10y)",pts:(c.term_prem||[]).slice(-520)}],
+    {h:170,aria:"期限溢酬",th:[{v:r.term_prem.alert,c:"var(--red)",label:`紅燈 ${r.term_prem.alert}`},{v:r.term_prem.watch,c:"var(--amber)",label:`黃燈 ${r.term_prem.watch}`}]});
+  lineChart(document.getElementById("c-s530"),[{n:"5s30s",c:"var(--s30y)",pts:(c.s530||[]).slice(-520)}],{h:170,aria:"5 年－30 年利差"});
+}
+
+function renderAuctions(){
+  const rows=DATA.auctions||[];
+  const t=document.getElementById("auc-table");
+  if(!rows.length){t.innerHTML='<tr><td style="color:var(--muted)">無資料</td></tr>';return;}
+  t.innerHTML=`<tr><th>日期</th><th>天期</th><th class="num">得標殖利率</th><th class="num">投標倍數</th><th class="num">前 6 場平均</th><th class="num">交易商承接</th><th class="num">前 6 場平均</th><th class="num">間接投標（外資代理）</th><th>判讀</th></tr>`+
+  rows.map(a=>`<tr class="${a.weak?"weak":a.soft?"soft":""}"><td class="mono">${a.date}</td><td>${a.bucket}${a.term&&!a.term.startsWith(a.bucket.replace("Y","-Year"))?` <span style="color:var(--faint)">(${esc(a.term)})</span>`:""}</td>
+    <td class="num mono">${fmt(a.high_yield,3)}%</td>
+    <td class="num mono ${a.avg_btc&&a.btc<a.avg_btc?"neg":""}">${fmt(a.btc,2)}</td><td class="num mono" style="color:var(--muted)">${fmt(a.avg_btc,2)}</td>
+    <td class="num mono ${a.avg_dealer!=null&&a.dealer_pct>a.avg_dealer?"neg":""}">${fmt(a.dealer_pct,1)}%</td><td class="num mono" style="color:var(--muted)">${fmt(a.avg_dealer,1)}%</td>
+    <td class="num mono">${fmt(a.indirect_pct,1)}%</td>
+    <td>${a.weak?'<span class="tag s-alert">偏弱</span>':a.soft?'<span class="tag s-watch">單項偏弱</span>':'<span class="tag s-ok">正常</span>'}</td></tr>`).join("");
+}
+
+function renderSwans(){
+  const box=document.getElementById("swan-cards");
+  if(!MANUAL){box.innerHTML='<div class="box" style="color:var(--muted)">讀不到 treasury_manual.json</div>';return;}
+  const byId=Object.fromEntries((DATA?.indicators||[]).map(i=>[i.id,i]));
+  const lv={green:"ok",yellow:"watch",red:"alert"}, nm={green:"平靜",yellow:"留意",red:"觸發"};
+  const today=new Date();
+  box.innerHTML=MANUAL.items.map(m=>{
+    const st=lv[m.level]||"ok", a=m.auto?byId[m.auto]:null;
+    const age=m.updated?Math.round((today-new Date(m.updated))/864e5):null;
+    return `<div class="swan s-${st}">
+      <div class="hd"><span class="dot s-${st}"></span><b>${esc(m.name)}</b><span class="tag s-${st}">${nm[m.level]||m.level}</span>${m.exit_trigger?'<span class="tag s-alert">出場觸發</span>':""}</div>
+      <p>${esc(m.impact)}</p>
+      <div><div class="k">要盯什麼</div><p>${esc(m.watch)}</p></div>
+      ${m.note?`<div class="note">${esc(m.note)}</div>`:""}
+      ${a?`<div class="auto"><span class="dot s-${a.status}" style="width:8px;height:8px"></span> 自動代理：${esc(a.name)} <span class="mono">${fmt(a.value,a.digits)}</span> ${esc(a.unit)}（${LABEL[a.status]}）</div>`:""}
+      <div class="auto">手動更新：${esc(m.updated||"—")}${age!=null&&age>30?` <span class="stale">· 已 ${age} 天沒更新</span>`:""}</div>
+    </div>`;}).join("");
+}
+
+function renderPositions(){
+  const ps=DATA.positions||[], y2=DATA.indicators.find(i=>i.id==="y2"), y30=DATA.indicators.find(i=>i.id==="y30");
+  let h=ps.map(p=>{
+    const sens=[0.25,0.5,1.0].map(d=>`<tr><td>殖利率 +${d.toFixed(2)}%</td><td class="num mono neg">${(-p.duration*d).toFixed(1)}%</td><td>殖利率 −${d.toFixed(2)}%</td><td class="num mono pos-v">+${(p.duration*d).toFixed(1)}%</td></tr>`).join("");
+    const c=v=>v==null?"":v<0?"neg":"pos-v";
+    return `<div class="box pc"><div class="top"><span class="sym">${p.symbol}</span><span class="px mono">${fmt(p.price,2)}</span><span style="color:var(--faint);font-size:11px">${p.date||""} · 存續期間約 ${p.duration}</span></div>
+      ${spark(p.spark,"info").replace('class="spark"','class="spark" style="width:100%;height:40px"')}
+      <div class="kv"><div>1 個月<b class="mono ${c(p.ret1m)}">${sgn(p.ret1m,1)}%</b></div><div>3 個月<b class="mono ${c(p.ret3m)}">${sgn(p.ret3m,1)}%</b></div><div>距 52 週高點<b class="mono ${c(p.dd52)}">${sgn(p.dd52,1)}%</b></div></div>
+      <table>${sens}</table></div>`;}).join("");
+  const tw=DATA.twd||{};
+  const carry=(y30&&y2&&y30.value!=null&&y2.value!=null)?(y30.value-y2.value):null;
+  h+=`<div class="box pc"><div class="top"><span class="sym">台幣角度</span></div>
+    <div class="kv" style="grid-template-columns:1fr 1fr"><div>USD/TWD<b class="mono">${fmt(tw.value,3)}</b></div><div>1 個月<b class="mono">${sgn(tw.chg1m,2)}%</b></div></div>
+    <p style="font-size:12.5px;color:var(--muted)">「逃離美國資產」時，美債跌、美元也貶，以台幣計價是雙重損失。看到股債匯三殺時，這一格要一起看。</p>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:8px">長債多拿的利息：30 年 − 2 年 ＝ <b class="mono" style="color:var(--ink)">${carry==null?"—":fmt(carry,2)+"%"}</b>。TLT 的價格風險約是短債的十倍以上，這是你多冒風險換到的補償。</p></div>`;
+  document.getElementById("pos-cards").innerHTML=h;
+}
+
+function renderAll(){
+  document.getElementById("updated").textContent="更新："+DATA.updated;
+  document.querySelectorAll("[data-r]").forEach(el=>{const [a,b]=el.dataset.r.split("."); const v=DATA.rules?.[a]?.[b]; if(v!=null) el.textContent=v;});
+  setOverall(); renderForms(); renderRows(); renderCharts(); renderAuctions(); renderSwans(); renderPositions();
+  if(DATA.errors?.length) document.getElementById("src-err").textContent="本次抓取失敗的來源："+DATA.errors.join("；");
+}
+
+document.querySelectorAll(".range button").forEach(b=>b.addEventListener("click",()=>{
+  b.parentNode.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  yieldsN=+b.dataset.n; if(DATA) renderCharts();
+}));
+
+let rT; window.addEventListener("resize",()=>{clearTimeout(rT); rT=setTimeout(()=>DATA&&renderCharts(),200);});
+
+Promise.all([
+  fetch("treasury_data.json?t="+Date.now()).then(r=>r.ok?r.json():Promise.reject("treasury_data.json")),
+  fetch("treasury_manual.json?t="+Date.now()).then(r=>r.ok?r.json():null).catch(()=>null),
+]).then(([d,m])=>{DATA=d; MANUAL=m; renderAll();})
+ .catch(e=>{const el=document.getElementById("err"); el.style.display="block";
+   el.textContent="尚未產生 treasury_data.json。請到 Actions 手動執行一次 Update dashboard data（底層邏輯說明在下方仍可閱讀）。";
+   fetch("treasury_manual.json").then(r=>r.json()).then(m=>{MANUAL=m;renderSwans();}).catch(()=>{});});
+</script>
+</body>
+</html>

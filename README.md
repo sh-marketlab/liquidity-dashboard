@@ -65,3 +65,12 @@ cd docs && python -m http.server 8000
 - **標售表某些欄位是「—」**：財政部API對部分歷史場次欄位缺漏，屬正常。
 - **想改更新頻率**：編輯 `.github/workflows/update.yml` 的 cron。
 - **想加指標**：在 `fetch_data.py` 的series清單加FRED代碼，再到 `index.html` 加一張卡片。
+
+## 美債危機監控頁（docs/treasury.html）
+
+追蹤「美債崩潰」最可能的五種形式（長債暴動、標售失敗、財政主導、流動性崩潰、債務上限）＋黑天鵝，給出紅／黃／綠／藍總燈號與 TLT、IEF 的對應動作；頁面最下方有完整的底層邏輯說明。
+
+- `fetch_treasury.py` → `docs/treasury_data.json`（Actions 每個工作日跑；門檻在檔案上方 `RULES`，存續期間在 `DURATION`）
+- `docs/treasury_manual.json`：黑天鵝手動狀態，在 GitHub 網頁直接改 `level`（green／yellow／red）、`note`、`updated`，存檔後重新整理網頁就生效。`exit_trigger: true` 的項目變 red，總燈號直接升紅燈。
+- 債務上限調整後：DTS 會自動抓新上限；抓不到時改 `RULES["debt_limit_fallback"]`。
+- 測試：`python -m pytest tests/test_treasury.py`
