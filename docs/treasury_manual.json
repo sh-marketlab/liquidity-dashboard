@@ -1,0 +1,101 @@
+{
+  "_說明": "黑天鵝手動狀態。level 改成 green / yellow / red，note 寫一句目前情況，updated 改成今天日期。exit_trigger=true 的項目變 red 時，網頁總燈號會直接升為紅燈。存檔後重新整理網頁即生效，不必等 Actions。",
+  "items": [
+    {
+      "id": "fed_independence",
+      "name": "Fed 獨立性受損",
+      "level": "green",
+      "exit_trigger": true,
+      "forms": ["f3"],
+      "auto": "breakeven",
+      "impact": "政府施壓 Fed 降息或買債來壓低政府利息。這是「財政主導」的開關：帳面上債券不一定跌，但通膨和美元貶值會偷走實質價值。對長債殺傷力最大。",
+      "watch": "總統或財政部公開要求降息／買債、Fed 理事被撤換、Fed 宣布為壓低政府借貸成本而購債、5y5y 通膨預期同時上升",
+      "note": "",
+      "updated": "2026-11-17"
+    },
+    {
+      "id": "fiscal_qe",
+      "name": "Fed 為財政目的重啟購債／殖利率曲線控制",
+      "level": "green",
+      "exit_trigger": true,
+      "forms": ["f3"],
+      "auto": null,
+      "impact": "央行直接印錢買政府的債＝把債務變成通膨。長債價格可能被托住，但實質購買力被稀釋，美元下跌，對台幣投資人是雙重損失。",
+      "watch": "FOMC 聲明出現「殖利率上限」「為市場運作購買長債」且無經濟衰退背景、財政部同時擴大長債發行",
+      "note": "",
+      "updated": "2026-11-17"
+    },
+    {
+      "id": "jgb_shock",
+      "name": "日本債市崩跌、日資撤回",
+      "level": "green",
+      "exit_trigger": false,
+      "forms": ["f1"],
+      "auto": "jgb",
+      "impact": "日本是美債最大的外國持有者。日債殖利率暴衝，日本壽險和退休基金可能賣美債搬回國內，美國長債少了大買家。",
+      "watch": "日本 10Y、30Y 殖利率急升，日圓急升，日本央行意外升息，TIC 報告日本持有減少",
+      "note": "",
+      "updated": "2026-11-17"
+    },
+    {
+      "id": "basis_trade",
+      "name": "基差交易（basis trade）平倉",
+      "level": "green",
+      "exit_trigger": false,
+      "forms": ["f4"],
+      "auto": "move",
+      "impact": "避險基金用高槓桿押注現貨與期貨的價差。一旦被追繳保證金被迫平倉，會在幾天內大量拋售美債，引發流動性崩跌（通常急跌後反彈）。",
+      "watch": "MOVE 指數急升、SOFR 異常飆升、CFTC 槓桿基金淨空單極端、新聞出現避險基金爆倉",
+      "note": "",
+      "updated": "2026-11-17"
+    },
+    {
+      "id": "foreign_tax",
+      "name": "對外國持有人課稅或限制",
+      "level": "green",
+      "exit_trigger": false,
+      "forms": ["f1", "f2"],
+      "auto": "auction",
+      "impact": "如果美國對外國人持有的美債利息課稅或設限，外資（目前約 3 成）可能大舉撤出，標售需求會先出問題。",
+      "watch": "法案中出現針對外國投資人的報復性稅條款、標售時間接投標（外資代理）比例明顯下降",
+      "note": "",
+      "updated": "2026-11-17"
+    },
+    {
+      "id": "war_oil",
+      "name": "戰爭擴大／油價飆升",
+      "level": "yellow",
+      "exit_trigger": false,
+      "forms": ["f3"],
+      "auto": "oil",
+      "impact": "國防支出增加讓赤字更大，油價飆升推升通膨。兩個都對長債不利。",
+      "watch": "原油一個月漲幅、國防追加預算、荷莫茲海峽航運",
+      "note": "伊朗戰事與談判仍在進行，國防支出已推高赤字",
+      "updated": "2026-11-17"
+    },
+    {
+      "id": "debt_ceiling",
+      "name": "債務上限僵局（約 2027 年 2 月）",
+      "level": "yellow",
+      "exit_trigger": false,
+      "forms": ["f5"],
+      "auto": "debt_room",
+      "impact": "國會吵到最後一刻才提高上限，X-date 前後到期的短期國庫券可能延遲付款。長債反而常因避險上漲。",
+      "watch": "距上限剩餘額度、財政部宣布非常措施、國會表決時程、短期國庫券殖利率在特定到期日異常飆高",
+      "note": "法定上限 41.104 兆，預估 2027 年 2 月中下旬碰頂",
+      "updated": "2026-11-17"
+    },
+    {
+      "id": "downgrade",
+      "name": "信用評等再被調降／財政失控新聞",
+      "level": "green",
+      "exit_trigger": false,
+      "forms": ["f1"],
+      "auto": "term_prem",
+      "impact": "三大評等機構都已不是 AAA。再降一級的實質影響有限，但會成為長債拋售的導火線。",
+      "watch": "評等機構展望調為負面、CBO 大幅上修赤字預估、利息支出佔稅收比例創新高",
+      "note": "",
+      "updated": "2026-11-17"
+    }
+  ]
+}
