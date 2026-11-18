@@ -134,7 +134,9 @@ def ici_mmf():
 
 def nyfed_sofr():
     """NY Fed 官方 SOFR (比 FRED 早幾小時)"""
-    data = json.loads(http_get("https://markets.newyorkfed.org/api/rates/secured/sofr/last/1500.json"))
+    start = (TODAY - timedelta(days=365 * 5)).isoformat()
+    data = json.loads(http_get("https://markets.newyorkfed.org/api/rates/secured/sofr/search.json"
+                               f"?startDate={start}&endDate={TODAY.isoformat()}"))
     out = [[r["effectiveDate"], float(r["percentRate"])] for r in data["refRates"] if r.get("percentRate") is not None]
     return sorted(out)
 
@@ -186,7 +188,7 @@ def last_us_session():
 
 # 與「最近收盤日」相比，正常最多落後幾個工作日；超過就標「資料過期」
 # HY OAS、SOFR 來源本身就是 T+1 公布，所以日資料容許落後 1 天
-MAX_LAG_BD = {"daily": 1, "weekly": 8, "monthly": 50, "quarterly": 75, "taiwan": 1}
+MAX_LAG_BD = {"daily": 1, "weekly": 8, "monthly": 70, "quarterly": 75, "taiwan": 1}
 SLOW_DAILY = {"dxy": 6}   # 廣義美元指數備援來源約落後一週
 
 
