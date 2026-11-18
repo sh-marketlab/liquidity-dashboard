@@ -152,6 +152,7 @@
 <section>
   <h2 class="sec"><b>手動檢查</b><span>沒有免費 API 的項目，每週或每月點進去看</span></h2>
   <div class="manual">
+    <a href="https://www.ici.org/research/stats/mmf" target="_blank" rel="noopener">ICI 貨幣基金 MMF<span>每週五早上｜看總額與機構型週變動，對照 RRP</span></a>
     <a href="https://yardeni.com/charts/us-stock-market/stock-market-technicals/margin-debt" target="_blank" rel="noopener">美股 Margin Debt<span>每月（FINRA 月中公布）｜散戶槓桿</span></a>
     <a href="https://www.newyorkfed.org/markets/desk-operations/repo" target="_blank" rel="noopener">NY Fed Repo 操作<span>SOFR−IORB 亮燈時才查｜誰在借</span></a>
     <a href="https://fred.stlouisfed.org/series/SOFRVOL" target="_blank" rel="noopener">SOFR 成交量<span>SOFR−IORB 亮燈時才查｜量是否跟著放大</span></a>
@@ -170,7 +171,7 @@
 </section>
 
 <footer>
-  資料來源：FRED（St. Louis Fed）、Yahoo Finance（MOVE、USD/TWD）、CNN Fear &amp; Greed、ICI（MMF）、臺灣證券交易所。<br>
+  資料來源：FRED（St. Louis Fed）、Yahoo Finance（MOVE、USD/TWD）、CNN Fear &amp; Greed、臺灣證券交易所。<br>
   FRED 部分序列有落後（廣義美元指數約一週、H.4.1 為週三數值於週四公布）。燈號門檻是起始值，用歷史資料回測後再調整。本頁只是觀察工具，不構成投資建議。
 </footer>
 
@@ -282,7 +283,7 @@ function spark(pts, status){
 // 要把某個指標升回固定顯示，把它的 id 加進下面對應的清單即可
 const TIERS = [
   ["每日核心","每天 2 分鐘：信用、恐慌、資金水管", ["hy","vix","sofr_iorb"]],
-  ["每週","週五早上 H.4.1 公布後一次看完", ["netliq","mmf","stlfsi","y2","curve","dxy","twd"]],
+  ["每週","週五早上 H.4.1 公布後一次看完（MMF 在手動檢查）", ["netliq","stlfsi","y2","curve","dxy","twd"]],
   ["每月","發布當週看趨勢，不看單月", ["core_pce","sahm"]],
   ["每季","「條件變化」的真正數據", ["sloos","term_premium"]],
 ];
