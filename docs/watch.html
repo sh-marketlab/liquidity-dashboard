@@ -24,6 +24,11 @@
   nav{margin-left:auto;font-size:12px;display:flex;gap:14px}
   nav a{color:var(--muted);text-decoration:none} nav a:hover{color:var(--ink)}
   #updated{color:var(--muted);font-size:12px}
+  #asof{font-size:12px;padding:2px 8px;border-radius:4px;background:rgba(63,184,175,.14);color:var(--teal)}
+  #asof.old{background:rgba(226,96,107,.18);color:var(--red)}
+  .stale-tag{display:inline-block;font-size:10.5px;color:var(--red);border:1px solid var(--red);border-radius:3px;padding:0 4px;margin-left:4px}
+  .row.is-stale .val,.row.is-stale svg{opacity:.45}
+  #stage-stale{font-size:12px;color:var(--red);margin-top:6px}
   .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
 
   /* 階段尺 */
@@ -112,6 +117,7 @@
 
 <header>
   <h1>每日觀察儀表板</h1>
+  <span id="asof" class="mono"></span>
   <span id="updated" class="mono">載入中…</span>
   <nav><a href="index.html">流動性供需</a><a href="cycle.html">週期</a><a href="calendar.html">債務日曆</a><a href="treasury.html">美債危機</a></nav>
 </header>
@@ -133,6 +139,7 @@
   </details>
   <div class="act" id="stage-act"></div>
   <div class="why" id="stage-why"></div>
+  <div id="stage-stale"></div>
 </div>
 
 <div class="two">
@@ -288,9 +295,9 @@ function row(i){
   const rule = showAct
     ? `<div class="a">${i.action}</div><div>${i.rule||""}</div>`
     : `<div>${i.rule||""}${i.rule&&i.action?"｜":""}${i.action||""}</div>`;
-  return `<div class="row s-${st}" title="${LABEL[st]}">
+  return `<div class="row s-${st}${i.stale?" is-stale":""}" title="${LABEL[st]}">
     <span class="dot" aria-label="${LABEL[st]}"></span>
-    <div class="nm"><div class="n">${i.name}</div><div class="src mono">${i.source}${i.date?" · "+i.date:""}</div></div>
+    <div class="nm"><div class="n">${i.name}</div><div class="src mono">${i.source}${i.date?" · "+i.date:""}${i.stale?`<span class="stale-tag">資料過期 ${i.age_bd} 個工作日</span>`:""}</div></div>
     <div class="val mono">${fmtVal(i,i.value)}<small>${UNIT_LABEL[i.unit]||""}</small></div>
     <div class="chg mono"><span class="${(i.chg||0)>0?"up":""}">${fmtChg(i)}</span><small>${i.chg_label||""}</small></div>
     <div class="sp">${spark(i.spark,st)}</div>
@@ -299,7 +306,13 @@ function row(i){
 }
 
 function render(d){
-  document.getElementById("updated").textContent = "更新 " + d.updated;
+  document.getElementById("updated").textContent = "程式執行 " + d.updated;
+  const asof = document.getElementById("asof");
+  if(d.core_asof){
+    const coreStale = d.indicators.some(i=>["hy","vix","sofr_iorb"].includes(i.id) && i.stale);
+    asof.textContent = "每日核心數據截至 " + d.core_asof + (d.last_session?`｜最近美股收盤 ${d.last_session}`:"") + (coreStale?"（過期）":"");
+    asof.className = "mono" + (coreStale?" old":"");
+  }
   const s=d.stage, names=["常態","壓力上升","急性壓力","見頂與托底","修復"];
   document.getElementById("steps").innerHTML = names.map((n,k)=>
     `<div class="step l${k} ${k===s.level?"on":""} ${k>=3?"self":""}"><b class="mono">${k}</b>${n}</div>`).join("");
@@ -307,11 +320,13 @@ function render(d){
   document.getElementById("stage-why").textContent = s.reasons.length
     ? "原因：" + s.reasons.join("、")
     : "所有自動判斷的壓力訊號都在門檻內。階段 3 需確認 Fed 或財政部已出手、STLFSI4 與 HY OAS 從高點回落。";
+  document.getElementById("stage-stale").textContent = (s.stale&&s.stale.length)
+    ? "⚠ 判斷用的資料過期：" + s.stale.join("、") + "。今天的階段可能不準，先到原始來源確認。" : "";
 
   const hot = d.indicators.filter(i=>i.status==="alert").concat(d.indicators.filter(i=>i.status==="watch"));
   document.getElementById("flags").innerHTML = hot.length ? hot.map(i=>
     `<div class="flagrow"><span class="flag-dot" style="color:${i.status==="alert"?"var(--red)":"var(--amber)"}">●</span>
-     <span>${i.name} <span class="mono">${fmtVal(i,i.value)}</span></span><span class="t">${i.status==="alert"?i.action:(i.note||i.rule)}</span></div>`).join("")
+     <span>${i.name} <span class="mono">${fmtVal(i,i.value)}</span>${i.stale?'<span class="stale-tag">過期</span>':""}</span><span class="t">${i.status==="alert"?i.action:(i.note||i.rule)}</span></div>`).join("")
     : '<div class="empty">今天沒有黃燈或紅燈。看完行事曆就可以關掉了。</div>';
 
   const na = d.indicators.filter(i=>i.status==="na").map(i=>i.name);

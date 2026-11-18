@@ -132,6 +132,64 @@ def ici_mmf():
     return hist
 
 
+def nyfed_sofr():
+    """NY Fed 官方 SOFR (比 FRED 早幾小時)"""
+    data = json.loads(http_get("https://markets.newyorkfed.org/api/rates/secured/sofr/last/1500.json"))
+    out = [[r["effectiveDate"], float(r["percentRate"])] for r in data["refRates"] if r.get("percentRate") is not None]
+    return sorted(out)
+
+
+def treasury_2y():
+    """美國財政部每日殖利率曲線 (當天收盤後即公布，FRED 要等隔一個工作日)"""
+    out = []
+    for yr in (TODAY.year - 1, TODAY.year):
+        url = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
+               f"daily-treasury-rates.csv/{yr}/all?type=daily_treasury_yield_curve&field_tdr_date_value={yr}&page&_format=csv")
+        lines = http_get(url).strip().splitlines()
+        head = [h.strip().strip('"') for h in lines[0].split(",")]
+        i2 = head.index("2 Yr")
+        for ln in lines[1:]:
+            c = [x.strip().strip('"') for x in ln.split(",")]
+            v = _num(c[i2]) if len(c) > i2 else None
+            if v is not None:
+                out.append([datetime.strptime(c[0], "%m/%d/%Y").strftime("%Y-%m-%d"), v])
+    return sorted(out)
+
+
+def prefer_fresh(primary, backup):
+    """兩個來源取最新日期較晚的那個；回傳 (序列, 是否用主來源)"""
+    if primary and (not backup or primary[-1][0] >= backup[-1][0]):
+        return primary, True
+    return backup, False
+
+
+def bdays_between(d1, d2):
+    """d1 之後到 d2 為止的工作日數 (不含 d1)"""
+    a = datetime.strptime(d1, "%Y-%m-%d").date()
+    n = 0
+    while a < d2:
+        a += timedelta(days=1)
+        if a.weekday() < 5:
+            n += 1
+    return n
+
+
+def last_us_session():
+    """程式執行當下，美股最近一個已收盤的交易日 (美東 17:00 後才算當天)"""
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("America/New_York"))
+    d = now.date() if now.hour >= 17 else now.date() - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
+# 與「最近收盤日」相比，正常最多落後幾個工作日；超過就標「資料過期」
+# HY OAS、SOFR 來源本身就是 T+1 公布，所以日資料容許落後 1 天
+MAX_LAG_BD = {"daily": 1, "weekly": 8, "monthly": 50, "quarterly": 75, "taiwan": 1}
+SLOW_DAILY = {"dxy": 6}   # 廣義美元指數備援來源約落後一週
+
+
 def _num(s):
     try:
         return float(str(s).replace(",", "").strip())
@@ -301,6 +359,9 @@ def main():
     dxy_s = safe("DXY", yahoo, "DX-Y.NYB")
     twd = safe("USD/TWD", yahoo, "TWD=X") or f["DEXTAUS"]
     fg = safe("Fear & Greed", cnn_fear_greed)
+    sofr, sofr_fast = prefer_fresh(safe("SOFR (NY Fed)", nyfed_sofr), f["SOFR"])
+    y2, y2_fast = prefer_fresh(safe("2Y (財政部)", treasury_2y), f["DGS2"])
+    vix, vix_fast = prefer_fresh(safe("VIX (Yahoo)", yahoo, "^VIX"), f["VIXCLS"])
     mmf = safe("MMF", ici_mmf)
     mmf_src = "ICI 每週四公布"
     if not mmf:   # ICI 擋 GitHub 主機時，改用 FRED 的零售 MMF (ICI 提供給 Fed，約落後 3 週)
@@ -320,8 +381,14 @@ def main():
         f"一個月擴大 ≥ {R['hy_chg1m']['alert']*100:.0f}bp 或 ≥ {R['hy_level']['alert']}%",
         "紅隊暫停加碼，檢查持股的負債結構", "FRED BAMLH0A0HYM2", "1 個月", hy_c))
 
-    sofr_map = {d: v for d, v in f["SOFR"]}
-    spread = [[d, round(sofr_map[d] - v, 4)] for d, v in f["IORB"] if d in sofr_map]
+    # IORB 只在 FOMC 調整，往後補值，才不會因 FRED 的 IORB 晚一天而少算最新的 SOFR
+    iorb = sorted(f["IORB"])
+    spread, k, cur = [], 0, None
+    for d, v in sofr:
+        while k < len(iorb) and iorb[k][0] <= d:
+            cur = iorb[k][1]; k += 1
+        if cur is not None:
+            spread.append([d, round(v - cur, 4)])
     streak = 0
     for d, v in reversed(spread):
         if month_end_window(d):
@@ -339,7 +406,7 @@ def main():
             st = "watch"
     out.append(ind("sofr_iorb", "daily", "SOFR − IORB", spread, "百分點", st,
         f"非月底連續 {R['sofr_iorb']['days']} 天 > {R['sofr_iorb']['watch']*100:.0f}bp；單日 > {R['sofr_iorb']['alert']*100:.0f}bp 為紅燈",
-        "留意水管壓力，對照稅務日與公債交割日", "FRED SOFR, IORB", None, None, 3,
+        "留意水管壓力，對照稅務日與公債交割日", ("NY Fed SOFR" if sofr_fast else "FRED SOFR") + ", FRED IORB", None, None, 3,
         note=f"非月底連續偏高 {streak} 天"))
 
     srf = f["RPONTSYD"]
@@ -351,16 +418,14 @@ def main():
         "銀行在向 Fed 借短錢，搭配 SOFR−IORB 一起看", "FRED RPONTSYD", None, None, 2,
         note="月底、月初使用量偏高屬常態"))
 
-    y2 = f["DGS2"]
     c = chg(y2, 5)
     out.append(ind("y2", "daily", "2 年期美債殖利率", y2, "%", level(abs(c) if c is not None else None, R["y2_chg1w"]),
         f"一週變動 ≥ {R['y2_chg1w']['watch']*100:.0f}bp", "對照 FedWatch，記錄市場預期改變的原因",
-        "FRED DGS2", "1 週", c))
+        "美國財政部" if y2_fast else "FRED DGS2", "1 週", c))
 
-    vix = f["VIXCLS"]
     out.append(ind("vix", "daily", "VIX", vix, "", level(last(vix)[1] if vix else None, R["vix"]),
         f"≥ {R['vix']['watch']} 壓力、≥ {R['vix']['alert']} 極端",
-        "≥30 不追高不殺低；≥40 準備紅隊進場清單（見階段規則）", "FRED VIXCLS", "1 週", chg(vix, 5), 1))
+        "≥30 不追高不殺低；≥40 準備紅隊進場清單（見階段規則）", "Yahoo ^VIX" if vix_fast else "FRED VIXCLS", "1 週", chg(vix, 5), 1))
 
     out.append(ind("move", "daily", "MOVE 美債波動", move, "", level(last(move)[1] if move else None, R["move"]),
         f"≥ {R['move']['watch']}", "債市不穩會傳導到抵押品與融資，提高現金意識",
@@ -487,6 +552,16 @@ def main():
         f"20 日變動 ≥ {R['margin_chg20d']['watch']}%", "大增＝散戶槓桿升溫；大減＝斬倉",
         "證交所 MI_MARGN", "20 日 %", c, 1))
 
+    # ---------------- 資料新鮮度 ----------------
+    ref_day = last_us_session()
+    for i in out:
+        if not i["date"]:
+            i["stale"], i["age_bd"] = False, None
+            continue
+        age = bdays_between(i["date"], ref_day)
+        lim = SLOW_DAILY.get(i["id"], MAX_LAG_BD.get(i["group"], 2))
+        i["age_bd"], i["stale"] = age, age > lim
+
     # ---------------- 階段建議 ----------------
     by = {i["id"]: i for i in out}
     reasons2, reasons1 = [], []
@@ -509,8 +584,14 @@ def main():
     else:
         stage = {"level": 0, "name": "常態", "action": "照常規配置，紅隊等均線", "reasons": []}
 
+    stage_ids = ["hy", "vix", "sofr_iorb", "srf", "stlfsi"]
+    stale_stage = [i["name"] for i in out if i["id"] in stage_ids and i.get("stale")]
+    stage["stale"] = stale_stage
+    core_dates = [i["date"] for i in out if i["id"] in ("hy", "vix", "sofr_iorb") and i["date"]]
     payload = {
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "core_asof": min(core_dates) if core_dates else None,
+        "last_session": ref_day.isoformat(),
         "stage": stage,
         "indicators": out,
     }
