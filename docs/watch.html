@@ -121,7 +121,7 @@
   <span id="updated" class="mono">載入中…</span>
   <nav><a href="index.html">流動性供需</a><a href="cycle.html">週期</a><a href="calendar.html">債務日曆</a><a href="treasury.html">美債危機</a></nav>
 </header>
-<p class="sub">每天只看「每日核心」3 個；每週五早上（H.4.1 公布後）看每週 7 個；其餘收在靜默區，亮燈才會出現在「需要注意」。綠＝正常、黃＝留意、紅＝觸發動作、空心＝只看趨勢。門檻在 fetch_watch.py 的 RULES 調整。</p>
+<p class="sub">每天只看「每日核心」4 個；每週五早上（H.4.1 公布後）看每週 7 個；其餘收在靜默區，亮燈才會出現在「需要注意」。綠＝正常、黃＝留意、紅＝觸發動作、空心＝只看趨勢。門檻在 fetch_watch.py 的 RULES 調整。</p>
 
 <div id="setup">尚未產生 watch_data.json。請到 Actions 手動執行一次 Update dashboard data。</div>
 
@@ -281,7 +281,7 @@ function spark(pts, status){
 // 核心視圖：只有這些指標固定顯示；其餘進靜默區（資料照抓，亮燈才浮上來）
 // 要把某個指標升回固定顯示，把它的 id 加進下面對應的清單即可
 const TIERS = [
-  ["每日核心","每天 2 分鐘：信用、恐慌、資金水管", ["hy","vix","sofr_iorb"]],
+  ["每日核心","每天 2 分鐘：信用、恐慌、資金水管、市場情緒", ["hy","vix","sofr_iorb","fg"]],
   ["每週","週五早上 H.4.1 公布後一次看完", ["netliq","mmf","stlfsi","y2","curve","dxy","twd"]],
   ["每月","發布當週看趨勢，不看單月", ["core_pce","sahm"]],
   ["每季","「條件變化」的真正數據", ["sloos","term_premium"]],
@@ -309,7 +309,7 @@ function render(d){
   document.getElementById("updated").textContent = "程式執行 " + d.updated;
   const asof = document.getElementById("asof");
   if(d.core_asof){
-    const coreStale = d.indicators.some(i=>["hy","vix","sofr_iorb"].includes(i.id) && i.stale);
+    const coreStale = d.indicators.some(i=>["hy","vix","sofr_iorb","fg"].includes(i.id) && i.stale);
     asof.textContent = "每日核心數據截至 " + d.core_asof + (d.last_session?`｜最近美股收盤 ${d.last_session}`:"") + (coreStale?"（過期）":"");
     asof.className = "mono" + (coreStale?" old":"");
   }

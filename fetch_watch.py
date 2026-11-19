@@ -500,9 +500,9 @@ def main():
 
     fv = last(fg)[1] if fg else None
     st = "na" if fv is None else ("watch" if (fv <= R["fg_low"] or fv >= R["fg_high"]) else "ok")
-    out.append(ind("fg", "weekly", "CNN Fear & Greed", fg, "", st,
+    out.append(ind("fg", "daily", "CNN Fear & Greed", fg, "", st,
         f"≤ {R['fg_low']} 或 ≥ {R['fg_high']}", "與 VIX、HY 重疊，只當反向參考",
-        "CNN", "1 週", chg(fg, 5), 0, spark=fg[::-5][::-1]))
+        "CNN", "1 週", chg(fg, 5), 0, spark=fg[-90:]))
 
     # ---------------- 每月 ----------------
     cpi_y, core_y = yoy(f["CPIAUCSL"]), yoy(f["CPILFESL"])
@@ -589,7 +589,7 @@ def main():
     stage_ids = ["hy", "vix", "sofr_iorb", "srf", "stlfsi"]
     stale_stage = [i["name"] for i in out if i["id"] in stage_ids and i.get("stale")]
     stage["stale"] = stale_stage
-    core_dates = [i["date"] for i in out if i["id"] in ("hy", "vix", "sofr_iorb") and i["date"]]
+    core_dates = [i["date"] for i in out if i["id"] in ("hy", "vix", "sofr_iorb", "fg") and i["date"]]
     payload = {
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "core_asof": min(core_dates) if core_dates else None,
