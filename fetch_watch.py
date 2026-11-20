@@ -1,6 +1,6 @@
 """
 每日觀察儀表板 - 數據抓取與燈號判斷
-來源: FRED (FRED_API_KEY)、Yahoo Finance (MOVE、USD/TWD)、CNN Fear & Greed、證交所、ICI (MMF)
+來源: FRED (FRED_API_KEY)、Yahoo Finance (MOVE、USD/TWD)、CNN Fear & Greed、證交所、ICI (MMF，手動)
 輸出: docs/watch_data.json  →  docs/watch.html 讀取
 
 調整門檻: 只要改下面 RULES 區塊的數字即可 (GitHub 網頁上直接編輯)。
@@ -95,42 +95,15 @@ def cnn_fear_greed():
     return out
 
 
-MMF_HISTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "mmf_history.json")
+MMF_MANUAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "mmf_manual.json")
 
 
-def ici_mmf():
-    """ICI 每週貨幣市場基金總資產 (十億美元)。
-    ICI 沒有免費 API：讀官網首段「$X trillion for the week ended …」，
-    每週存進 docs/mmf_history.json 累積成走勢 (第一次只有一個點)。"""
-    try:
-        with open(MMF_HISTORY, encoding="utf-8") as fh:
-            hist = json.load(fh)
-    except (OSError, ValueError):
-        hist = []
-    html = http_get("https://www.ici.org/research/stats/mmf", {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.ici.org/research/stats",
-    })
-    text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"&nbsp;|\s+", " ", text)
-    m = re.search(r"\$\s?([\d.,]+)\s*trillion[^$]{0,120}?(?:week|period) ended\s+(?:[A-Z][a-z]+day,?\s+)?([A-Z][a-z]+)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?", text)
-    if not m:
-        raise ValueError("ICI 頁面格式改變，找不到總資產句子")
-    val = round(float(m.group(1).replace(",", "")) * 1000, 1)
-    mon = datetime.strptime(m.group(2)[:3], "%b").month
-    yr = int(m.group(4)) if m.group(4) else TODAY.year
-    dd = date(yr, mon, int(m.group(3)))
-    if dd > TODAY + timedelta(days=7):   # 年初讀到去年 12 月的數字
-        dd = date(yr - 1, mon, int(m.group(3)))
-    d = dd.isoformat()
-    hist = [x for x in hist if x[0] != d] + [[d, val]]
-    hist.sort(key=lambda x: x[0])
-    hist = hist[-260:]
-    with open(MMF_HISTORY, "w", encoding="utf-8") as fh:
-        json.dump(hist, fh)
-    return hist
-
+def mmf_manual():
+    """ICI 擋 GitHub 主機，MMF 改為手動：每週把 ICI 表格的 Total / Retail / Institutional
+    加一行到 docs/mmf_manual.json (十億美元)"""
+    with open(MMF_MANUAL, encoding="utf-8") as fh:
+        rows = sorted(json.load(fh), key=lambda r: r["date"])
+    return rows
 
 def nyfed_sofr():
     """NY Fed 官方 SOFR (比 FRED 早幾小時)"""
@@ -364,11 +337,12 @@ def main():
     sofr, sofr_fast = prefer_fresh(safe("SOFR (NY Fed)", nyfed_sofr), f["SOFR"])
     y2, y2_fast = prefer_fresh(safe("2Y (財政部)", treasury_2y), f["DGS2"])
     vix, vix_fast = prefer_fresh(safe("VIX (Yahoo)", yahoo, "^VIX"), f["VIXCLS"])
-    mmf = safe("MMF", ici_mmf)
-    mmf_src = "ICI 每週四公布"
-    if not mmf:   # ICI 擋 GitHub 主機時，改用 FRED 的零售 MMF (ICI 提供給 Fed，約落後 3 週)
-        mmf = safe("MMF 備援 WRMFNS", fred, "WRMFNS")
-        mmf_src = "FRED WRMFNS（僅零售，ICI 抓不到時的備援）"
+    try:
+        mmf_rows = mmf_manual()
+        print(f"  MMF 手動: {len(mmf_rows)} 筆")
+    except (OSError, ValueError, KeyError) as e:
+        print(f"  MMF 手動檔讀取失敗: {e}")
+        mmf_rows = []
     foreign, margin = twse_foreign_and_margin()
     print(f"  證交所: 外資 {len(foreign)} 天, 融資 {len(margin)} 天")
 
@@ -465,11 +439,16 @@ def main():
     out.append(ind("rrp", "weekly", "ON RRP 隔夜逆回購", f["WLRRAL"], "百萬美元", "info",
         "接近零代表緩衝已用完", "", "FRED WLRRAL", "4 週", chg(f["WLRRAL"], 4), 0))
 
-    mc = chg(mmf, 4) if len(mmf) > 4 else None
-    out.append(ind("mmf", "weekly", "MMF 貨幣基金總資產" if mmf_src.startswith("ICI") else "MMF 零售貨幣基金", mmf, "十億美元", "info",
-        "與 RRP、淨流動性一起看", "MMF 增加而 RRP 沒增加＝錢停在 T-bill；MMF 大減＝資金流回風險資產或被提領",
-        mmf_src, "4 週", mc, 0,
-        note=None if len(mmf) > 4 else f"歷史累積中（目前 {len(mmf)} 週）"))
+    mmf = [[r["date"], r["total"]] for r in mmf_rows]
+    mmf_note = None
+    if len(mmf_rows) >= 2:
+        p0, p1 = mmf_rows[-2], mmf_rows[-1]
+        mmf_note = (f"零售 {p1['retail']:,.2f}（{p1['retail'] - p0['retail']:+.2f}）｜"
+                    f"機構 {p1['institutional']:,.2f}（{p1['institutional'] - p0['institutional']:+.2f}）")
+    out.append(ind("mmf", "weekly", "MMF 貨幣基金總資產", mmf, "十億美元", "info",
+        "與 RRP、淨流動性一起看；週變動主要反映資金淨流入/流出",
+        "MMF 增加而 RRP 沒增加＝錢停在 T-bill；機構型大減＝資金流回風險資產或被提領",
+        "ICI（手動輸入，docs/mmf_manual.json）", "1 週", chg(mmf, 1), 2, note=mmf_note))
 
     sf = f["STLFSI4"]
     c = chg(sf, 4)
