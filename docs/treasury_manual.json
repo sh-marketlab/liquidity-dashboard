@@ -1,5 +1,7 @@
 {
   "_說明": "黑天鵝手動狀態。level 改成 green / yellow / red，note 寫一句目前情況，updated 改成今天日期。exit_trigger=true 的項目變 red 時，網頁總燈號會直接升為紅燈。存檔後重新整理網頁即生效，不必等 Actions。",
+  "debt_limit_resolved": "",
+  "_debt_limit_resolved_說明": "國會解決債務上限那天填 YYYY-MM-DD（例如 2027-06-15）。如果是「提高上限」，網頁會從財政部資料自動偵測，可不填；如果是「暫停上限」，一定要填。填了之後 60 天內是 TGA 回補期，下一次 Actions 執行後生效。",
   "items": [
     {
       "id": "fed_independence",

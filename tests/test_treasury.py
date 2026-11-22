@@ -120,3 +120,81 @@ def test_missing_sources_do_not_crash():
     p = ft.compute({"_errors": ["all down"]})
     assert p["overall"]["level"] == "green"
     assert by_id(p)["y30"]["status"] == "na"
+
+
+# ---------- 3M 國庫券 − 政策上限、水管連動、TGA 回補期 ----------
+def crash_raw(gap):
+    """S&P 從高點跌 20% 且 2Y 一個月降 0.6 → 藍燈第二路徑成立；gap = 3M − 上限"""
+    n = 300
+    return base_raw(spx=series([6000] * (n - 1) + [4800]),
+                    y2=series([4.6] * (n - 1) + [4.0]),
+                    bill3m=series([4.0 + gap] * n), fed_upper=series([4.0] * 5))
+
+
+def watch_payload(sofr="ok", srf="ok"):
+    return {"stage": {"level": 0, "name": "常態"},
+            "indicators": [{"id": "sofr_iorb", "status": sofr, "value": 0.12, "date": "2026-11-19",
+                            "spark": [["2026-11-18", 0.02], ["2026-11-19", 0.12]]},
+                           {"id": "srf", "status": srf, "value": 0.0}]}
+
+
+def test_gap_ffill():
+    g = ft.gap_ffill([["2026-01-02", 4.2], ["2026-01-05", 4.3]], [["2025-12-01", 4.0]])
+    assert g == [["2026-01-02", 0.2], ["2026-01-05", 0.3]]
+
+
+def test_blue_when_no_hike_priced():
+    p = ft.compute(crash_raw(-0.20))
+    assert p["overall"]["level"] == "blue"
+    assert by_id(p)["y2"]["status"] == "rev"
+
+
+def test_hike_priced_blocks_blue_path():
+    p = ft.compute(crash_raw(0.23))
+    assert p["overall"]["level"] != "blue"
+    assert by_id(p)["y2"]["status"] == "info"
+    assert by_id(p)["bill_gap"]["value"] == 23.0
+    assert any("不算衰退型" in o for o in p["overall"]["other"])
+
+
+def test_sahm_blue_not_blocked_by_hike_pricing():
+    raw = crash_raw(0.23)
+    raw["sahm"] = series([0.6] * 300)
+    assert ft.compute(raw)["overall"]["level"] == "blue"
+
+
+def test_plumb_links_watch_into_form4():
+    p = ft.compute(base_raw(watch=watch_payload(sofr="watch")))
+    assert by_id(p)["plumb"]["status"] == "watch"
+    assert p["forms"]["f4"]["status"] == "watch"
+    assert p["overall"]["level"] == "green"   # 水管單獨亮不改總燈號
+    assert by_id(p)["plumb"]["value"] == 12.0
+
+
+def test_tga_rebuild_window_plus_plumb_gives_yellow():
+    d = (ft.TODAY - timedelta(days=9)).isoformat()
+    p = ft.compute(base_raw(watch=watch_payload(srf="alert")), {"debt_limit_resolved": d})
+    t = by_id(p)["tga_rebuild"]
+    assert t["status"] == "watch" and t["value"] == 10
+    assert p["overall"]["level"] == "yellow"
+
+
+def test_tga_rebuild_window_without_plumb_is_trend_only():
+    d = (ft.TODAY - timedelta(days=9)).isoformat()
+    p = ft.compute(base_raw(watch=watch_payload()), {"debt_limit_resolved": d})
+    assert by_id(p)["tga_rebuild"]["status"] == "info"
+    assert p["overall"]["level"] == "green"
+
+
+def test_tga_rebuild_auto_detect_limit_raise():
+    d0, d1 = (ft.TODAY - timedelta(days=40)).isoformat(), (ft.TODAY - timedelta(days=20)).isoformat()
+    raw = base_raw(watch=watch_payload(sofr="watch"))
+    raw["debt"] = dict(raw["debt"], limit_hist=[[d0, 41104.0], [d1, 46104.0]], limit=46104.0)
+    t = by_id(ft.compute(raw))["tga_rebuild"]
+    assert t["status"] == "watch" and t["value"] == 21
+
+
+def test_tga_rebuild_expired_window():
+    d = (ft.TODAY - timedelta(days=90)).isoformat()
+    p = ft.compute(base_raw(watch=watch_payload(sofr="alert")), {"debt_limit_resolved": d})
+    assert by_id(p)["tga_rebuild"]["status"] == "ok"

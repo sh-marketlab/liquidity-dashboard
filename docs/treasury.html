@@ -335,6 +335,9 @@
       <li><b>長債標售</b>：投標倍數（越低越沒人要）、交易商承接（越高越像硬吃）、間接投標（外資需求）。</li>
       <li><b>5y5y 通膨預期＋金價對美元</b>：市場是否開始擔心央行用印鈔解決債務。</li>
       <li><b>債務上限剩餘額度</b>：技術性違約的倒數計時。</li>
+      <li><b>債限解決後的 TGA 回補期</b>：國會解決上限後，財政部會大量發國庫券把存款（TGA）補回來，錢從銀行體系被抽走。ON RRP 已經接近零，沒有緩衝，所以這 60 天比撞牆當下更要盯水管。</li>
+      <li><b>水管壓力（SOFR−IORB、SRF）</b>：銀行間現金是不是變緊。這是形式 ④ 的訊號，不是長債暴動的提前警報；兩者應對相反（④ 通常急跌後反彈，不要恐慌賣）。燈號直接讀每日觀察頁。</li>
+      <li><b>3 個月國庫券 − 政策利率上限</b>：高於上限＝市場在定價升息。這時 2 年期下跌多半是避險買盤，不要誤判成「Fed 要轉鴿、衰退型來了」。</li>
       <li><b>財政部發債規劃（每季 Refunding）</b>：財政部刻意少發長債對 TLT 是支撐；如果改口大發長債就是警訊。（手動看，見債務日曆）</li>
       <li><b>外國人持有美債（TIC 報告）</b>：日本、中國有沒有持續減持。（手動看，每月中公布）</li>
     </ul>
@@ -346,9 +349,9 @@
     <div class="scroll" style="margin-top:10px"><table>
       <tr><th>燈號</th><th>條件（這頁自動判斷的就是這張表）</th><th>動作（參考）</th></tr>
       <tr><td><span class="tag s-ok">🟢 綠燈</span></td><td>30 年期 &lt; <span data-r="y30.watch">5.5</span>%，標售正常，股債呈反向走勢</td><td>維持部位</td></tr>
-      <tr><td><span class="tag s-watch">🟡 黃燈</span></td><td>任一項：30 年期 ≥ <span data-r="y30.watch">5.5</span>%；長債標售連續 <span data-r="auction.watch">2</span> 場偏弱；期限溢價 ≥ <span data-r="term_prem.watch">1.3</span></td><td>先把 1/3 的 TLT 換成 IEF 或短債</td></tr>
+      <tr><td><span class="tag s-watch">🟡 黃燈</span></td><td>任一項：30 年期 ≥ <span data-r="y30.watch">5.5</span>%；長債標售連續 <span data-r="auction.watch">2</span> 場偏弱；期限溢價 ≥ <span data-r="term_prem.watch">1.3</span>；債限解決後 <span data-r="tga_rebuild.days">60</span> 天內（TGA 回補期）水管又亮燈</td><td>先把 1/3 的 TLT 換成 IEF 或短債</td></tr>
       <tr><td><span class="tag s-alert">🔴 紅燈</span></td><td>任一項：30 年期連續 <span data-r="y30.days">3</span> 天站上前高 <span data-r="y30.alert">5.73</span>%；股債匯三殺連續 <span data-r="triple.alert_days">3</span> 天；Fed 獨立性明確受損或開始財政性印鈔（黑天鵝清單手動標紅）</td><td><b>TLT 大部分出清</b>，轉入短債（SGOV、BIL）或抗通膨債 TIPS（SCHP）；IEF 減碼</td></tr>
-      <tr><td><span class="tag s-rev">🔵 藍燈</span></td><td>沙姆法則 ≥ <span data-r="recession.sahm">0.5</span>；或 S&amp;P 從高點跌 ≥ <span data-r="recession.spx_dd">15</span>% 且 2 年期一個月降 ≥ 0.5</td><td>衰退型，TLT 通常會漲：<b>不要恐慌賣出</b></td></tr>
+      <tr><td><span class="tag s-rev">🔵 藍燈</span></td><td>沙姆法則 ≥ <span data-r="recession.sahm">0.5</span>；或 S&amp;P 從高點跌 ≥ <span data-r="recession.spx_dd">15</span>% 且 2 年期一個月降 ≥ 0.5（但 3 個月國庫券高於政策上限時不算：市場還在定價升息）</td><td>衰退型，TLT 通常會漲：<b>不要恐慌賣出</b></td></tr>
     </table></div>
     <p style="margin-top:10px"><b>實用原則</b></p>
     <ol>
@@ -363,7 +366,7 @@
 </section>
 
 <footer>
-  資料：FRED（DGS2/5/10/30、THREEFYTP10、T5YIFR、SAHMREALTIME、IRLTLT01JPM156N）、Yahoo Finance（^GSPC、TLT、IEF、DX-Y.NYB、^MOVE、GC=F、CL=F、TWD=X）、財政部 FiscalData（標售、DTS 債務上限、平均利率）。<br>
+  資料：FRED（DGS2/5/10/30、THREEFYTP10、T5YIFR、SAHMREALTIME、IRLTLT01JPM156N、DGS3MO、DFEDTARU）、每日觀察頁（SOFR−IORB、SRF）、流動性頁（準備金、TGA）、Yahoo Finance（^GSPC、TLT、IEF、DX-Y.NYB、^MOVE、GC=F、CL=F、TWD=X）、財政部 FiscalData（標售、DTS 債務上限、平均利率）。<br>
   <span id="src-err"></span>
 </footer>
 
@@ -380,9 +383,9 @@ const GROUPS = [
   ["① 長債暴動","財政信任的核心指標",["y30","y10","term_prem","steepen","triple","avg_rate","jgb"]],
   ["② 標售失敗","買家是否在罷工（明細見下方標售表）",["auction"]],
   ["③ 財政主導","錢會不會變薄",["breakeven","gold_dxy","oil"]],
-  ["④ 流動性崩潰","恐慌時的被迫賣壓",["move","liq_crash"]],
-  ["⑤ 債務上限","技術性違約倒數",["debt_room"]],
-  ["🔵 反向訊號：衰退型","亮藍燈時 TLT 通常受惠",["sahm","y2"]],
+  ["④ 流動性崩潰","恐慌時的被迫賣壓；水管燈直接連動每日觀察頁",["move","liq_crash","plumb"]],
+  ["⑤ 債務上限","技術性違約倒數，以及解決後的 TGA 回補抽水",["debt_room","tga_rebuild"]],
+  ["🔵 反向訊號：衰退型","亮藍燈時 TLT 通常受惠；3M 國庫券高於政策上限時，2Y 下跌不算數",["sahm","y2","bill_gap"]],
 ];
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt = (v,d=2) => v==null||isNaN(v) ? "—" : Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
