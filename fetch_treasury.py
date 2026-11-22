@@ -39,6 +39,11 @@ RULES = {
     "oil":        {"watch": 15.0, "alert": 30.0},               # 油價一個月漲幅 (%)
     # 反向訊號 (衰退型)：沙姆法則 ≥ 0.5，或 (S&P 從高點跌 ≥15% 且 2Y 一個月降 ≥0.5)
     "recession":  {"sahm": 0.5, "spx_dd": 15.0, "y2_drop": -0.50},
+    # 3 個月國庫券 − Fed 目標區間上限 (百分點)。≥ hike = 市場在定價 3 個月內升息：
+    # 這時「股市大跌＋2Y 急降」那條藍燈路徑不亮 (沙姆法則那條不受影響)
+    "bill_gap":   {"hike": 0.10},
+    # 債限解決 (提高或暫停) 後幾天內算「TGA 回補期」；期間若水管 (SOFR−IORB / SRF) 亮燈 → 黃燈
+    "tga_rebuild": {"days": 60},
 }
 # 存續期間 (殖利率變動 1% → 價格約變動 %)，查 iShares 官網更新
 DURATION = {"TLT": 16.5, "IEF": 7.3}
@@ -128,8 +133,9 @@ def fd_debt():
         elif "subject to limit" in cat and "total" in cat:
             d["subject"] = v / 1000
     hist = sorted([[k, v["subject"]] for k, v in by_date.items() if "subject" in v])
-    lim = [v["limit"] for k, v in sorted(by_date.items()) if "limit" in v]
-    return {"subject": hist, "limit": lim[-1] if lim else None, "source": "財政部 DTS 表 III-C"}
+    lim_hist = [[k, v["limit"]] for k, v in sorted(by_date.items()) if v.get("limit")]
+    return {"subject": hist, "limit": lim_hist[-1][1] if lim_hist else None,
+            "limit_hist": lim_hist, "source": "財政部 DTS 表 III-C"}
 
 
 def fd_debt_fallback():
@@ -268,6 +274,30 @@ def thin(s, step):
         return []
     out = s[::-1][::step][::-1]
     return out
+
+
+def gap_ffill(a, b):
+    """a − b，b 是不常變動的序列 (如政策利率上限)，用前值補齊日期"""
+    if not a or not b:
+        return []
+    b = sorted(b)
+    out, j, cur = [], 0, None
+    for d, v in sorted(a):
+        while j < len(b) and b[j][0] <= d:
+            cur = b[j][1]
+            j += 1
+        if cur is not None:
+            out.append([d, round(v - cur, 3)])
+    return out
+
+
+def limit_raised_date(lim_hist):
+    """DTS 法定上限最後一次「提高」的日期 (暫停型解決不會出現在這裡，要手動填)"""
+    raised = None
+    for (_, p), (d, v) in zip(lim_hist or [], (lim_hist or [])[1:]):
+        if p and v and v > p + 1:
+            raised = d
+    return raised
 
 
 def ind(id_, name, s, unit, status, rule, what, why, source, chg_label=None, chg_value=None,
@@ -425,6 +455,34 @@ def compute(raw, manual=None):
         "Yahoo ^GSPC、TLT", None, None, 0, value=len(crash_days),
         note="、".join(d for d, _ in crash_days) or None, forms=["f4"], spark=[]))
 
+    # 水管壓力：直接讀每日觀察 (watch_data.json) 的 SOFR−IORB 與 SRF 燈號，不重抓、不另設門檻
+    W = R.get("watch") or {}
+    wby = {i["id"]: i for i in (W.get("indicators") or [])}
+    so, sr = wby.get("sofr_iorb") or {}, wby.get("srf") or {}
+    plumb_st = worst([so.get("status", "na"), sr.get("status", "na")])
+    liq = R.get("liq") or {}
+    bits = []
+    if sr.get("value") is not None:
+        bits.append(f"SRF {sr['value']:.1f}B")
+    if liq.get("reserves"):
+        bits.append(f"準備金 {liq['reserves'][1] / 1e6:.2f} 兆（{liq['reserves'][0]}）")
+    if liq.get("tga"):
+        bits.append(f"TGA {liq['tga'][1] / 1e6:.2f} 兆")
+    stg = W.get("stage") or {}
+    if stg.get("name"):
+        bits.append(f"每日觀察階段 {stg.get('level')}：{stg['name']}")
+    so_sp = [[d, round(v * 100, 1)] for d, v in (so.get("spark") or [])]
+    out.append(ind("plumb", "水管壓力（連動每日觀察）", so_sp, "bp", plumb_st,
+        "SOFR−IORB 或 SRF 任一亮燈就跟著亮（門檻在 fetch_watch.py，兩頁一致）",
+        "隔夜借錢的利率（SOFR）比 Fed 付給銀行的利率（IORB）高多少，以及銀行有沒有跑去跟 Fed 借急錢（SRF）。",
+        "銀行體系現金變緊時，槓桿基金拿不到資金，會被迫賣美債換現金，就是形式 ④。"
+        "目前有 SRF 托底、Fed 也在買短債補準備金，所以單看準備金水位不準，要看價格（SOFR−IORB）有沒有被擠上去。",
+        "連動 watch_data.json（NY Fed SOFR、FRED IORB／RPONTSYD）；準備金、TGA 取自 data.json（H.4.1）",
+        None, None, 1, value=(so["value"] * 100 if so.get("value") is not None else None),
+        note="・".join(bits) or None, forms=["f4"], spark=so_sp))
+    if so.get("date"):
+        out[-1]["date"] = so["date"]
+
     # ---------- ⑤ 債務上限 ----------
     debt = R.get("debt") or {}
     sub = debt.get("subject") or []
@@ -446,6 +504,34 @@ def compute(raw, manual=None):
         "用完又沒提高上限，少數快到期的短債可能延遲付款（技術性違約）。長債反而常因避險上漲。",
         debt.get("source", "財政部 DTS"), "1 個月", chg([[d, limit - v] for d, v in sub], 21) if sub else None, 0,
         value=room, note=note, forms=["f5"]))
+
+    # 債限解決後的 TGA 回補期：解決日 = 手動填 (treasury_manual.json 的 debt_limit_resolved，暫停型必填)
+    # 或 DTS 法定上限被提高的日期 (自動)
+    M = manual or {}
+    resolved = (M.get("debt_limit_resolved") or "").strip() or limit_raised_date(debt.get("limit_hist"))
+    win = RULES["tga_rebuild"]["days"]
+    day_n = None
+    if resolved:
+        try:
+            day_n = (TODAY - date.fromisoformat(resolved)).days + 1
+        except ValueError:
+            day_n = None
+    in_win = day_n is not None and 1 <= day_n <= win
+    if in_win:
+        st = "watch" if plumb_st in ("watch", "alert") else "info"
+        note = (f"債限 {resolved} 解決，回補期第 {day_n}／{win} 天。"
+                + ("水管同時亮燈 → 黃燈" if st == "watch" else "水管目前正常，只看趨勢"))
+    else:
+        st = "ok"
+        note = (f"上次解決 {resolved}，回補期已過" if day_n and day_n > win else
+                "尚未進入。提高上限會自動偵測；若國會是「暫停」上限，請在 treasury_manual.json 填 debt_limit_resolved")
+    out.append(ind("tga_rebuild", "債限解決後 TGA 回補期", [], "天", st,
+        f"解決後 {win} 天內＋水管（SOFR−IORB／SRF）亮燈 → 黃燈",
+        "債限卡住時財政部只能花存款（TGA 變低＝錢流回市場）；國會一解決，財政部會大量發國庫券把 TGA 補回來。",
+        "補回來的錢是從銀行體系抽走的。2023 年那次主要由 ON RRP 吸收，現在 ON RRP 幾乎是零，這次會直接抽到準備金，"
+        "所以真正的流動性風險常在「解決之後」而不是撞牆當下。回補量取決於撞牆期間 TGA 降到多低。",
+        "手動 treasury_manual.json／財政部 DTS 法定上限變動", None, None, 0,
+        value=day_n if in_win else None, note=note, forms=["f4", "f5"], spark=[]))
 
     # ---------- 背景：財政負擔 ----------
     ar = g("avg_rate")
@@ -473,21 +559,47 @@ def compute(raw, manual=None):
     y2 = g("y2")
     y2c = chg(y2, 21)
     dd = drawdown(spx)
-    rec_reasons = []
+    bgap = gap_ffill(g("bill3m"), g("fed_upper"))
+    bg = lastv(bgap)
+    hike_priced = bg is not None and bg >= RULES["bill_gap"]["hike"]
+    y2_drop = y2c is not None and y2c <= RULES["recession"]["y2_drop"]
+    rec_reasons, rec_blocked = [], None
     if lastv(sahm) is not None and lastv(sahm) >= RULES["recession"]["sahm"]:
         rec_reasons.append(f"沙姆法則 {lastv(sahm):.2f} ≥ {RULES['recession']['sahm']}")
-    if dd is not None and y2c is not None and dd <= -RULES["recession"]["spx_dd"] and y2c <= RULES["recession"]["y2_drop"]:
-        rec_reasons.append(f"S&P 從高點 {dd:.1f}% 且 2Y 一個月 {y2c:+.2f}")
+    if dd is not None and y2_drop and dd <= -RULES["recession"]["spx_dd"]:
+        if hike_priced:
+            rec_blocked = (f"S&P 從高點 {dd:.1f}% 且 2Y 一個月 {y2c:+.2f}，但 3M 國庫券仍高於政策上限 "
+                           f"{bg * 100:.0f}bp（市場還在定價升息）→ 不算衰退型")
+        else:
+            rec_reasons.append(f"S&P 從高點 {dd:.1f}% 且 2Y 一個月 {y2c:+.2f}")
     out.append(ind("sahm", "沙姆法則（衰退訊號）", sahm, "百分點",
         "rev" if lastv(sahm) is not None and lastv(sahm) >= RULES["recession"]["sahm"] else ("ok" if sahm else "na"),
         f"≥ {RULES['recession']['sahm']} ＝衰退型（藍燈）", "失業率 3 個月均值比過去一年低點高多少。",
         "衰退時 Fed 降息、錢湧進美債，TLT 反而會漲。用來分辨下一場危機是哪一型。",
         "FRED SAHMREALTIME", "較上月", chg(sahm, 1), 2, spark=sahm[-36:], forms=[]))
+    y2note = [f"S&P 500 距 52 週高點 {dd:.1f}%"] if dd is not None else []
+    if y2_drop and hike_priced:
+        y2note.append("但 3M 國庫券高於政策上限，下跌可能只是避險買盤，不是押降息")
     out.append(ind("y2", "2 年期殖利率", y2, "%",
-        "rev" if y2c is not None and y2c <= RULES["recession"]["y2_drop"] else ("info" if y2 else "na"),
-        f"一個月下降 ≥ {abs(RULES['recession']['y2_drop'])} 搭配股市大跌＝衰退型",
+        "rev" if y2_drop and not hike_priced else ("info" if y2 else "na"),
+        f"一個月下降 ≥ {abs(RULES['recession']['y2_drop'])} 搭配股市大跌＝衰退型（3M 國庫券高於政策上限時不算）",
         "跟 Fed 政策利率最貼近的利率。", "2 年期急降＝市場在押 Fed 要大降息，通常是衰退型危機（對長債有利）。",
-        "FRED DGS2", "1 個月", y2c, 2, note=f"S&P 500 距 52 週高點 {dd:.1f}%" if dd is not None else None))
+        "FRED DGS2", "1 個月", y2c, 2, note="；".join(y2note) or None))
+
+    up = lastv(g("fed_upper"))
+    bnote = []
+    if bg is not None:
+        bnote.append(f"3M {lastv(g('bill3m')):.2f}% vs 上限 {up:.2f}%")
+        bnote.append("≥ 門檻：市場在定價 3 個月內升息" if hike_priced else
+                     "低於門檻：沒有明顯的升息定價" if bg >= 0 else "低於上限：市場偏向降息")
+    out.append(ind("bill_gap", "3 個月國庫券 − 政策利率上限", [[d, round(v * 100, 1)] for d, v in bgap], "bp",
+        "info" if bgap else "na",
+        f"只看趨勢；≥ {RULES['bill_gap']['hike'] * 100:.0f}bp 時，「股市大跌＋2Y 急降」那條藍燈路徑不亮",
+        "3 個月期國庫券利率，減掉 Fed 目標區間上限（也是 SRF 利率）。",
+        "3 個月國庫券高過上限＝市場認為 Fed 3 個月內會升息。這時 2 年期下跌多半是避險買盤，不是押降息，"
+        "不能當成衰退型（對長債有利）的訊號。注意：國庫券大量發行（例如 TGA 回補）也會把它推高，搭配 CME FedWatch 一起看。",
+        "FRED DGS3MO − DFEDTARU", "1 個月", (chg(bgap, 21) * 100 if chg(bgap, 21) is not None else None), 0,
+        value=(bg * 100 if bg is not None else None), note="；".join(bnote) or None))
 
     # ---------- 我的部位 ----------
     ief = g("ief")
@@ -520,8 +632,13 @@ def compute(raw, manual=None):
         yellow.append(f"長債標售連續 {by['auction']['value']} 場偏弱")
     if lastv(tp) is not None and lastv(tp) >= RULES["term_prem"]["watch"]:
         yellow.append(f"期限溢酬 {lastv(tp):.2f} ≥ {RULES['term_prem']['watch']}")
+    if by["tga_rebuild"]["status"] == "watch":
+        yellow.append(f"債限解決後 TGA 回補期第 {by['tga_rebuild']['value']} 天，且水管亮燈")
     other = [f"{i['name']}（{'紅' if i['status'] == 'alert' else '黃'}）" for i in out
-             if i["status"] in ("watch", "alert") and i["id"] not in ("y30", "triple", "auction", "term_prem")]
+             if i["status"] in ("watch", "alert")
+             and i["id"] not in ("y30", "triple", "auction", "term_prem", "tga_rebuild")]
+    if rec_blocked:
+        other.append(rec_blocked)
 
     ACT = {
         "red": ("紅燈：財政信任崩潰型", "TLT 大部分出清，轉入短債（SGOV、BIL）或抗通膨債 TIPS（SCHP）；IEF 減碼。分批執行。"),
@@ -550,7 +667,7 @@ def compute(raw, manual=None):
         "twd": twd_info,
         "charts": {
             "y2": y2[-520:], "y10": y10[-520:], "y30": y30[-520:],
-            "term_prem": tp[-520:], "s530": s530[-520:],
+            "term_prem": tp[-520:], "s530": s530[-520:], "bill_gap": bgap[-520:],
         },
         "rules": RULES,
         "errors": R.get("_errors", []),
@@ -575,7 +692,8 @@ def gather():
     if FRED_KEY:
         for key, sid in (("y2", "DGS2"), ("y5", "DGS5"), ("y10", "DGS10"), ("y30", "DGS30"),
                          ("term_prem", "THREEFYTP10"), ("breakeven", "T5YIFR"),
-                         ("sahm", "SAHMREALTIME"), ("jgb", "IRLTLT01JPM156N")):
+                         ("sahm", "SAHMREALTIME"), ("jgb", "IRLTLT01JPM156N"),
+                         ("bill3m", "DGS3MO"), ("fed_upper", "DFEDTARU")):
             safe(key, fred, sid)
     else:
         errors.append("未設定 FRED_API_KEY")
@@ -587,13 +705,31 @@ def gather():
     if not raw.get("debt") or not raw["debt"].get("subject"):
         safe("debt", fd_debt_fallback)
     safe("avg_rate", fd_avg_rate)
+    # 同一個 Actions 流程裡 fetch_data.py、fetch_watch.py 先跑，這裡直接讀它們的輸出
+    safe("watch", read_local, "watch_data.json")
+    safe("liq", local_liq)
     raw["_errors"] = errors
     return raw
 
 
+def read_local(name):
+    with open(os.path.join(HERE, "docs", name), encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def local_liq():
+    sup = read_local("data.json").get("supply") or {}
+    return {k: sup[k][-1] for k in ("reserves", "tga") if sup.get(k)}
+
+
 def main():
     print("抓取美債監控資料…")
-    payload = compute(gather())
+    try:
+        manual = read_local("treasury_manual.json")
+    except Exception as e:  # noqa: BLE001
+        print(f"  ✗ manual: {e}")
+        manual = {}
+    payload = compute(gather(), manual)
     path = os.path.join(HERE, "docs", "treasury_data.json")
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False)
