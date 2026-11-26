@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>逃生檢查表</title>
+<meta name="theme-color" content="#0B1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="逃生檢查">
+<link rel="manifest" href="escape.webmanifest">
+<link rel="icon" href="escape-icon-192.png">
+<link rel="apple-touch-icon" href="escape-icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 與 watch.html 同一套色票 */
+  :root{
+    --bg:#0B1220; --panel:#111B2D; --panel2:#0E1626; --line:#1E2A40;
+    --ink:#D9E2EF; --muted:#7E8CA3; --faint:#4A5670;
+    --teal:#3FB8AF; --amber:#E0A458; --red:#E2606B; --blue:#5B8DD9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    font-size:15px;line-height:1.55;
+    padding:calc(14px + env(safe-area-inset-top)) max(14px,4vw) calc(48px + env(safe-area-inset-bottom));
+    max-width:880px;margin:0 auto}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  a{color:var(--blue)}
+  header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:12px}
+  h1{font-size:19px;font-weight:700;letter-spacing:.04em}
+  nav{margin-left:auto;font-size:12px;display:flex;gap:12px}
+  nav a{color:var(--muted);text-decoration:none}
+  .meta{width:100%;display:flex;flex-wrap:wrap;gap:6px 10px;font-size:12px;color:var(--muted)}
+  #asof{padding:1px 8px;border-radius:4px;background:rgba(63,184,175,.14);color:var(--teal)}
+  #asof.old{background:rgba(226,96,107,.18);color:var(--red)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+  .k{font-size:11px;color:var(--muted);letter-spacing:.12em;margin-bottom:8px}
+  #line{font-size:16px;font-weight:700;line-height:1.5;margin-bottom:12px}
+  .ladders{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:640px){.ladders{grid-template-columns:1fr 1fr}}
+  .lad .lt{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between}
+  .steps{display:grid;gap:4px}
+  .step{border-radius:6px;padding:6px 2px;font-size:11px;text-align:center;background:var(--panel2);color:var(--faint);border:1px solid var(--line);line-height:1.3}
+  .step b{display:block;font-size:14px}
+  .step.on{color:var(--c);border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent)}
+  .lad .nx{font-size:12px;color:var(--muted);margin-top:6px}
+  .act{margin-top:12px;font-size:14px;padding:8px 10px;border-radius:6px;background:var(--panel2);border-left:3px solid var(--c,var(--teal))}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font-size:12px;padding:2px 8px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .chip b{color:var(--ink);font-weight:500}
+  .warn{font-size:12px;color:var(--amber);margin-top:8px}
+
+  h2{font-size:13px;letter-spacing:.12em;color:var(--muted);font-weight:500;margin:22px 0 8px;display:flex;gap:8px;align-items:baseline}
+  h2 span{font-size:11px;letter-spacing:.02em;color:var(--faint)}
+
+  /* 11 個訊號 */
+  .sig{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;overflow:hidden}
+  .sig summary{list-style:none;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;cursor:pointer}
+  .sig summary::-webkit-details-marker{display:none}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--faint)}
+  .s-green .dot{background:var(--teal)} .s-yellow .dot{background:var(--amber)} .s-red .dot{background:var(--red)}
+  .s-na .dot{background:transparent;border:1.5px dashed var(--faint)}
+  .s-yellow{border-color:rgba(224,164,88,.45)} .s-red{border-color:rgba(226,96,107,.55)}
+  .nm{min-width:0}
+  .nm .n{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .nm .n i{font-style:normal;color:var(--faint);font-size:12px;margin-right:4px}
+  .nm .d{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .val{text-align:right}
+  .val .v{font-size:16px;font-weight:600}
+  .val .u{font-size:11px;color:var(--muted)}
+  .val .dt{font-size:11px;color:var(--faint)}
+  .stale{color:var(--red)!important}
+  .stale-tag{font-size:10px;color:var(--red);border:1px solid var(--red);border-radius:3px;padding:0 3px;margin-left:3px}
+  .more{padding:0 12px 12px 34px;font-size:12.5px;color:var(--muted)}
+  .more p{margin-bottom:4px} .more b{color:var(--ink);font-weight:500}
+  .spark{width:100%;height:46px;display:block;margin-top:6px}
+
+  /* 條件清單 */
+  .grid3{display:grid;grid-template-columns:1fr;gap:10px}
+  @media(min-width:760px){.grid3{grid-template-columns:repeat(3,1fr)}}
+  .cl h3{font-size:13px;font-weight:500;margin-bottom:6px;display:flex;justify-content:space-between}
+  .cl h3 .cnt{font-size:12px;color:var(--muted)}
+  .cl ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+  .cl li{display:grid;grid-template-columns:22px 26px 1fr;gap:4px;font-size:12.5px;color:var(--muted);align-items:baseline}
+  .cl li .ic{font-size:13px}
+  .cl li.on{color:var(--ink)}
+  .cl li .id{color:var(--faint);font-family:'IBM Plex Mono',monospace;font-size:11.5px}
+
+  /* 輔助 */
+  .aux{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  @media(min-width:640px){.aux{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  .ax{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
+  .ax .n{font-size:12px;color:var(--muted)}
+  .ax .v{font-size:17px;font-weight:600}
+  .ax .d{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+  .ax .dt{font-size:10.5px;color:var(--faint)}
+
+  /* 歷史 */
+  #hist svg{width:100%;height:120px;display:block}
+  .legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+  .ev{display:grid;grid-template-columns:86px 54px 1fr;gap:6px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--panel2)}
+  .ev .d{color:var(--muted)} .ev .t{font-size:11px;color:var(--blue)}
+  .ev.soon .d{color:var(--amber)}
+
+  details.logic{font-size:13px;color:var(--muted)}
+  details.logic summary{cursor:pointer;color:var(--blue);margin-bottom:6px}
+  details.logic h4{color:var(--ink);font-size:13px;margin:10px 0 4px}
+  details.logic ul{margin-left:18px}
+  footer{font-size:12px;color:var(--muted);margin-top:22px;line-height:1.7}
+  #install{display:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin-bottom:12px}
+  #install button{background:var(--blue);color:#fff;border:0;border-radius:6px;padding:4px 10px;margin-left:6px;font-size:12px}
+  #empty{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>逃生檢查表 <span style="font-size:13px;color:var(--muted);font-weight:400">台美股</span></h1>
+  <nav><a href="watch.html">每日觀察</a><a href="index.html">流動性</a><a href="treasury.html">美債</a></nav>
+  <div class="meta">
+    <span id="asof" class="mono">—</span>
+    <span id="updated"></span>
+  </div>
+</header>
+
+<div id="install"></div>
+
+<div id="empty" class="card">還沒有資料：到 GitHub repo → Actions → <b>Update dashboard data</b> → Run workflow，跑完約 3 分鐘後重新整理。</div>
+
+<div id="main">
+  <div class="card" id="hero">
+    <div class="k">今日盤勢</div>
+    <div id="line">載入中…</div>
+    <div class="ladders">
+      <div class="lad" id="lad-esc"></div>
+      <div class="lad" id="lad-rec"></div>
+    </div>
+    <div class="act" id="act"></div>
+    <div class="chips" id="chips"></div>
+    <div class="warn" id="warn"></div>
+  </div>
+
+  <h2>11 項訊號 <span>點開看規則、來源與走勢</span></h2>
+  <div id="signals"></div>
+
+  <h2>階段條件</h2>
+  <div class="grid3">
+    <div class="card cl" id="cl-det"></div>
+    <div class="card cl" id="cl-dan"></div>
+    <div class="card cl" id="cl-rec"></div>
+  </div>
+
+  <h2>輔助指標</h2>
+  <div class="aux" id="aux"></div>
+
+  <h2>階段走勢 <span>每個美股交易日一格</span></h2>
+  <div class="card" id="hist"></div>
+
+  <h2>接下來的重要行程</h2>
+  <div class="card" id="events"></div>
+
+  <div class="card">
+    <details class="logic">
+      <summary>判定邏輯（全部規則）</summary>
+      <h4>架構</h4>
+      <p>11 個燈號說明「哪裡出問題」，情境分類判斷「是哪種下跌」，逃生／回升兩把梯子把結果轉成行動程度。改編自 money_crazybird 的暴跌檢查清單（韓國版），韓國項目換成台股：三星／海力士 → 台積電、外資 KOSPI → 外資台股、韓元 → 新台幣、KOSPI → 加權指數。</p>
+      <h4>逃生階段</h4>
+      <ul>
+        <li>1 觀察：紅燈 ≤ 2 且高收益債不是紅燈</li>
+        <li>2 警戒：紅燈 ≥ 3，或高收益債亮紅</li>
+        <li>3 防禦準備：第 2 階段 + 惡化訊號 ≥ 2</li>
+        <li>4 迴避：危險訊號 ≥ 2（不論其他條件）</li>
+      </ul>
+      <h4>回升階段</h4>
+      <ul>
+        <li>0 下跌進行中：回升訊號 0～1</li>
+        <li>1 探底：2～3</li>
+        <li>2 評估分批重新進場：≥ 4 且危險訊號 0</li>
+        <li>3 趨勢回升：≥ 5、含 R3、逃生 ≤ 2</li>
+      </ul>
+      <h4>情境</h4>
+      <ul>
+        <li>高收益債紅燈 → 2007 次貸／2000 網路泡沫型（跌幅大）</li>
+        <li>高收益債沒紅、2 年期 &gt; 利率上限、核心 CPI 黃或紅 → 2022 空頭型（跌得淺、拖得久）</li>
+        <li>2 年期 ≤ 利率上限、核心 CPI 綠 → 2023 年 10 月型（多頭）</li>
+      </ul>
+      <h4>資料說明</h4>
+      <ul>
+        <li>找不到的資料顯示「無法確認」，不計入紅燈，也不算成立的條件。</li>
+        <li>台積電、七巨頭用 Yahoo 分析師的明年 EPS 預估變化；第 11 項優先用手動填的明年資本支出指引（docs/escape_manual.json），沒填時用最新一季實際年增率當近似值，標 *。</li>
+        <li>市場寬度用 S&amp;P 500 成分股日線自己算，有資料的檔數低於 80% 就不判定。</li>
+        <li>核心 CPI 用指數自算月增率，四捨五入到 0.1 後套門檻，與官方公布口徑一致。</li>
+        <li>200 日線、死亡交叉、薩姆規則、失業率都是落後指標；真正偏領先的是高收益債、日圓、2 年期。</li>
+      </ul>
+    </details>
+  </div>
+
+  <footer>
+    指標監控，並非買賣建議。判定只依固定規則，門檻是經驗值、未經回測，指標可能發出假警報，也可能在下跌已經開始後才亮燈。
+  </footer>
+</div>
+
+<script>
+const ST = {green:'var(--teal)', yellow:'var(--amber)', red:'var(--red)', na:'var(--faint)'};
+const ESC_C = {1:'var(--teal)',2:'var(--amber)',3:'var(--red)',4:'var(--red)'};
+const REC_C = {0:'var(--red)',1:'var(--amber)',2:'var(--teal)',3:'var(--teal)'};
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (v, u) => v === null || v === undefined ? '—' :
+  (Math.abs(v) >= 1000 ? v.toLocaleString('en-US', {maximumFractionDigits: 0}) : String(v));
+const $ = id => document.getElementById(id);
+
+function spark(s, color){
+  if(!s || s.length < 2) return '';
+  const v = s.map(p => p[1]), mn = Math.min(...v), mx = Math.max(...v), W = 300, H = 46;
+  const pts = v.map((y, i) => `${(i/(v.length-1)*W).toFixed(1)},${(H-3-(mx===mn?0.5:(y-mn)/(mx-mn))*(H-6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke" points="${pts}"/></svg>
+    <div class="mono" style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint)"><span>${esc(s[0][0])}</span><span>低 ${fmt(+mn.toFixed(2))}／高 ${fmt(+mx.toFixed(2))}</span><span>${esc(s[s.length-1][0])}</span></div>`;
+}
+
+function ladder(el, title, cur, list, colors, next){
+  el.innerHTML = `<div class="lt"><span>${title}</span><span class="mono" style="color:${colors[cur]}">第 ${cur} 階段</span></div>
+    <div class="steps" style="grid-template-columns:repeat(${list.length},1fr)">
+      ${list.map(([n, name]) => `<div class="step ${n===cur?'on':''}" style="--c:${colors[n]}"><b>${n}</b>${name}</div>`).join('')}
+    </div><div class="nx">${esc(next)}</div>`;
+}
+
+function checklist(el, title, items, need){
+  const n = items.filter(c => c.on === true).length;
+  el.innerHTML = `<h3><span>${title}</span><span class="cnt">${n} 個成立${need?'／門檻 '+need:''}</span></h3><ul>` +
+    items.map(c => `<li class="${c.on?'on':''}"><span class="ic">${c.on===true?'✅':c.on===false?'▫️':'❔'}</span><span class="id">${esc(c.id)}</span><span>${esc(c.text)}${c.on===null?' <span style="color:var(--faint)">（無法確認）</span>':''}</span></li>`).join('') + '</ul>';
+}
+
+function histChart(h){
+  if(!h || !h.length){ $('hist').innerHTML = '<div style="color:var(--muted);font-size:13px">累積中：每天跑完會多一格。</div>'; return; }
+  const W = 600, H = 120, n = h.length, bw = W / Math.max(n, 60);
+  let bars = '';
+  h.forEach((e, i) => {
+    const x = i * bw, eh = e.esc / 4 * 52, rh = e.rec / 3 * 40;
+    bars += `<rect x="${x.toFixed(1)}" y="${(56-eh).toFixed(1)}" width="${Math.max(bw-1,1).toFixed(1)}" height="${eh.toFixed(1)}" fill="${ESC_C[e.esc]}" opacity=".85"><title>${e.d} 逃生 ${e.esc}・回升 ${e.rec}</title></rect>`;
+    bars += `<rect x="${x.toFixed(1)}" y="64" width="${Math.max(bw-1,1).toFixed(1)}" height="${rh.toFixed(1)}" fill="var(--blue)" opacity=".7"><title>${e.d} 回升 ${e.rec}</title></rect>`;
+  });
+  $('hist').innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}<line x1="0" x2="${W}" y1="60" y2="60" stroke="var(--line)"/></svg>
+    <div class="legend"><span><i style="background:var(--red)"></i>上排：逃生階段（越高越危險）</span><span><i style="background:var(--blue)"></i>下排：回升階段（越長越好）</span>
+    <span class="mono">${esc(h[0].d)} → ${esc(h[n-1].d)}</span></div>`;
+}
+
+async function load(){
+  let d;
+  try{
+    const r = await fetch('escape_data.json?ts=' + Date.now(), {cache: 'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    d = await r.json();
+  }catch(e){
+    $('main').style.display = 'none'; $('empty').style.display = 'block'; return;
+  }
+  const S = d.summary;
+  $('asof').textContent = '美股資料日 ' + d.last_session;
+  $('updated').textContent = '程式執行 ' + d.updated;
+  const lag = (Date.now() - new Date(d.last_session + 'T21:00:00Z')) / 864e5;
+  if(lag > 4) $('asof').classList.add('old');
+
+  $('line').textContent = S.line;
+  ladder($('lad-esc'), '逃生（有多危險）', S.escape.stage, [[1,'觀察'],[2,'警戒'],[3,'防禦準備'],[4,'迴避']], ESC_C, S.escape.next);
+  ladder($('lad-rec'), '回升（是否過了底部）', S.recovery.stage, [[0,'下跌中'],[1,'探底'],[2,'分批評估'],[3,'趨勢回升']], REC_C, S.recovery.next);
+  $('act').style.setProperty('--c', ESC_C[S.escape.stage]);
+  $('act').innerHTML = `<b>該做的事：</b>${esc(S.escape.action)}`;
+  const c = S.count;
+  $('chips').innerHTML = `<span class="chip">🔴 <b>${c.red}</b></span><span class="chip">🟡 <b>${c.yellow}</b></span><span class="chip">🟢 <b>${c.green}</b></span>` +
+    (c.na ? `<span class="chip">⚪ 無法確認 <b>${c.na}</b></span>` : '') +
+    `<span class="chip">情境：<b>${esc(S.scenario.name)}</b></span>`;
+  const w = [];
+  if(S.na.length) w.push('無法確認：' + S.na.join('、') + '（不計入紅燈，判定可能偏樂觀）');
+  if(S.stale.length) w.push('資料過期：' + S.stale.join('、'));
+  w.push(S.scenario.desc);
+  $('warn').innerHTML = w.map(esc).join('<br>');
+  $('warn').style.color = (S.na.length || S.stale.length) ? 'var(--amber)' : 'var(--muted)';
+
+  $('signals').innerHTML = d.signals.map(s => `
+    <details class="sig s-${s.status}">
+      <summary>
+        <span class="dot"></span>
+        <span class="nm"><div class="n"><i>${esc(s.no)}</i>${esc(s.name)}</div><div class="d">${esc(s.detail || s.rule)}</div></span>
+        <span class="val"><div class="v mono">${s.value===null?'無法確認':fmt(s.value)}<span class="u"> ${s.value===null?'':esc(s.unit)}</span></div>
+          <div class="dt mono ${s.stale?'stale':''}">${esc(s.date || '')}${s.stale?'<span class="stale-tag">過期</span>':''}</div></span>
+      </summary>
+      <div class="more">
+        <p><b>規則：</b>${esc(s.rule)}</p>
+        ${s.detail ? `<p><b>細節：</b>${esc(s.detail)}</p>` : ''}
+        <p><b>來源：</b>${esc(s.source)}</p>
+        ${spark(s.spark, ST[s.status])}
+      </div>
+    </details>`).join('');
+
+  checklist($('cl-det'), '惡化訊號 a–h', d.deter, '2（且已在第 2 階段）');
+  checklist($('cl-dan'), '危險訊號 ①–⑤', d.danger, '2');
+  checklist($('cl-rec'), '回升訊號 R1–R6', d.recov, '');
+
+  $('aux').innerHTML = d.aux.map(a => `<div class="ax"><div class="n">${esc(a.name)}</div>
+    <div class="v mono">${fmt(a.value)}</div>${a.detail?`<div class="d">${esc(a.detail)}</div>`:''}
+    <div class="dt mono ${a.stale?'stale':''}">${esc(a.date||'')}${a.stale?' 過期':''}</div></div>`).join('');
+
+  histChart(d.history);
+
+  const today = new Date().toISOString().slice(0,10);
+  const soon = new Date(Date.now() + 7*864e5).toISOString().slice(0,10);
+  $('events').innerHTML = d.events.length ? d.events.map(e => `<div class="ev ${e.d<=soon?'soon':''}"><span class="d mono">${esc(e.d)}</span><span class="t">${esc(e.tag)}</span><span>${esc(e.t)}</span></div>`).join('')
+    : '<div style="color:var(--muted);font-size:13px">docs/escape_manual.json 的 events 沒有未來行程，請補上。</div>';
+}
+load();
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') load(); });
+
+// ---- 加到主畫面（PWA）----
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('escape-sw.js', {scope: './escape'}).catch(()=>{}); }
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+let deferred;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferred = e;
+  $('install').style.display = 'block';
+  $('install').innerHTML = '把這頁裝成手機 App <button id="ib">安裝</button>';
+  $('ib').onclick = async () => { deferred.prompt(); await deferred.userChoice; $('install').style.display = 'none'; };
+});
+if(!standalone && /iPhone|iPad|iPod/.test(navigator.userAgent)){
+  $('install').style.display = 'block';
+  $('install').textContent = '裝成 App：在 Safari 點「分享」→「加入主畫面」。';
+}
+</script>
+</body>
+</html>

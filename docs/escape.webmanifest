@@ -1,0 +1,15 @@
+{
+  "name": "逃生檢查表（台美股）",
+  "short_name": "逃生檢查",
+  "description": "台美股逃生／回升階段每日判定",
+  "start_url": "escape.html",
+  "scope": "escape",
+  "display": "standalone",
+  "background_color": "#0B1220",
+  "theme_color": "#0B1220",
+  "lang": "zh-Hant",
+  "icons": [
+    {"src": "escape-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "escape-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
