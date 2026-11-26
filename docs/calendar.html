@@ -69,7 +69,6 @@
 
 <header>
   <h1>美債流動性與債務日曆</h1>
-  <nav><a href="watch.html">每日觀察</a><a href="index.html">流動性供需</a><a href="cycle.html">週期</a><a href="treasury.html">美債危機</a></nav>
 </header>
 <p class="sub" id="note">載入中…</p>
 <div id="err">讀不到 calendar_events.json。</div>
@@ -141,5 +140,6 @@ function render(J){
 fetch("calendar_events.json",{cache:"no-store"}).then(r=>{ if(!r.ok) throw 0; return r.json(); })
   .then(render).catch(()=>{ document.getElementById("err").style.display="block"; document.getElementById("note").textContent=""; });
 </script>
+<script src="site-nav.js"></script>
 </body>
 </html>
