@@ -188,7 +188,6 @@
 <header>
   <h1>美債危機監控</h1>
   <span id="updated" class="mono">載入中…</span>
-  <nav class="top"><a href="watch.html">每日觀察</a><a href="index.html">流動性供需</a><a href="cycle.html">週期</a><a href="calendar.html">債務日曆</a></nav>
 </header>
 <p class="sub">追蹤「美債崩潰」最可能發生的樣子：長期利率失控、標售沒人買、央行被迫印鈔、流動性崩跌、債務上限。每個工作日自動更新；黑天鵝清單在 <span class="mono">docs/treasury_manual.json</span> 手動更新；門檻在 <span class="mono">fetch_treasury.py</span> 的 RULES 調整。忘記邏輯時，直接看最下面的「底層邏輯」。</p>
 
@@ -595,5 +594,6 @@ Promise.all([
    el.textContent="尚未產生 treasury_data.json。請到 Actions 手動執行一次 Update dashboard data（底層邏輯說明在下方仍可閱讀）。";
    fetch("treasury_manual.json").then(r=>r.json()).then(m=>{MANUAL=m;renderSwans();}).catch(()=>{});});
 </script>
+<script src="site-nav.js"></script>
 </body>
 </html>

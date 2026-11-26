@@ -290,5 +290,6 @@ svg.querySelectorAll('.rib').forEach(el=>el.addEventListener('click',()=>{docume
  document.getElementById('now').innerHTML=`資料更新：<b>${S.updated}</b>。資產負債表為週資料（每週四公布週三數值），其餘為日資料。滑過圖表看數值，點上方色帶跳到該階段。`;}
 })().catch(e=>{document.getElementById('now').textContent='資料載入失敗：'+e.message+'（請確認 cycle_data.json 與本頁在同一資料夾）';});
 </script>
+<script src="site-nav.js"></script>
 </body>
 </html>

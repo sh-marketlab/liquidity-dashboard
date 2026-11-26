@@ -9,6 +9,10 @@ permissions:
   contents: write
   issues: write
 
+concurrency:
+  group: update-dashboard
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -68,4 +72,6 @@ jobs:
           git add docs/escape_tw_foreign.json || true
           git add docs/escape_sp500.json || true
           git diff --cached --quiet || git commit -m "data update"
+          # 執行期間 main 可能有新的 commit（例如剛合併 PR），先接上再推
+          git pull --rebase --autostash
           git push
