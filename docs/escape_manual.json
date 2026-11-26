@@ -1,30 +1,118 @@
 {
   "_說明": "逃生檢查表的手動資料。在 GitHub 網頁直接編輯存檔即可，下次 Actions 執行就生效。",
   "capex_guidance": {
-    "_說明": "第 11 項：四大雲端業者『明年』資本支出成長率指引（%）。每季財報後更新一次：growth_pct 填數字（例如 25），updated 填當天日期。growth_pct 留 null 時，程式改用 yfinance 最新一季實際年增率當近似值（頁面會標 *）。",
+    "_說明": "第 11 項：四大雲端業者『明年』資本支出成長率指引（%）。明年的數字通常要到 1 月底～2 月初第四季財報才公布，在那之前 growth_pct 保持 null，程式會用 yfinance 最新一季實際年增率代替（頁面標「近似」）；不想用代替值，把 fetch_escape.py 的 RULES capex_fallback 改成 \"na\"。公司公布數字後填 growth_pct（例如 25）與 updated（當天日期）。qualitative 可填財報會議的質化說法（例如：明年成長金額明顯大於今年），只顯示、不判定。",
     "items": {
-      "MSFT": {"growth_pct": null, "basis": "", "source": "", "updated": ""},
-      "GOOGL": {"growth_pct": null, "basis": "", "source": "", "updated": ""},
-      "META": {"growth_pct": null, "basis": "", "source": "", "updated": ""},
-      "AMZN": {"growth_pct": null, "basis": "", "source": "", "updated": ""}
+      "MSFT": {
+        "growth_pct": null,
+        "qualitative": "",
+        "basis": "",
+        "source": "",
+        "updated": ""
+      },
+      "GOOGL": {
+        "growth_pct": null,
+        "qualitative": "",
+        "basis": "",
+        "source": "",
+        "updated": ""
+      },
+      "META": {
+        "growth_pct": null,
+        "qualitative": "",
+        "basis": "",
+        "source": "",
+        "updated": ""
+      },
+      "AMZN": {
+        "growth_pct": null,
+        "qualitative": "",
+        "basis": "",
+        "source": "",
+        "updated": ""
+      }
     }
   },
   "events": [
-    {"d": "2026-12-04", "t": "美國 11 月就業報告", "tag": "就業"},
-    {"d": "2026-12-09", "t": "FOMC 利率決議（含 SEP）", "tag": "FOMC"},
-    {"d": "2026-12-10", "t": "美國 11 月 CPI", "tag": "CPI"},
-    {"d": "2027-01-08", "t": "美國 12 月就業報告", "tag": "就業"},
-    {"d": "2027-01-13", "t": "美國 12 月 CPI", "tag": "CPI"},
-    {"d": "2027-01-27", "t": "FOMC 利率決議", "tag": "FOMC"},
-    {"d": "2027-02-05", "t": "美國 1 月就業報告", "tag": "就業"},
-    {"d": "2027-02-11", "t": "美國 1 月 CPI", "tag": "CPI"},
-    {"d": "2027-03-10", "t": "美國 2 月 CPI", "tag": "CPI"},
-    {"d": "2027-03-17", "t": "FOMC 利率決議", "tag": "FOMC"},
-    {"d": "2027-04-28", "t": "FOMC 利率決議", "tag": "FOMC"},
-    {"d": "2027-06-09", "t": "FOMC 利率決議", "tag": "FOMC"},
-    {"d": "2027-07-28", "t": "FOMC 利率決議", "tag": "FOMC"},
-    {"d": "2027-09-15", "t": "FOMC 利率決議", "tag": "FOMC"},
-    {"d": "2027-10-27", "t": "FOMC 策略會議（不做利率決議）", "tag": "FOMC"},
-    {"d": "2027-11-17", "t": "FOMC 利率決議（2027 年最後一次）", "tag": "FOMC"}
+    {
+      "d": "2026-12-04",
+      "t": "美國 11 月就業報告",
+      "tag": "就業"
+    },
+    {
+      "d": "2026-12-09",
+      "t": "FOMC 利率決議（含 SEP）",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2026-12-10",
+      "t": "美國 11 月 CPI",
+      "tag": "CPI"
+    },
+    {
+      "d": "2027-01-08",
+      "t": "美國 12 月就業報告",
+      "tag": "就業"
+    },
+    {
+      "d": "2027-01-13",
+      "t": "美國 12 月 CPI",
+      "tag": "CPI"
+    },
+    {
+      "d": "2027-01-27",
+      "t": "FOMC 利率決議",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2027-02-05",
+      "t": "美國 1 月就業報告",
+      "tag": "就業"
+    },
+    {
+      "d": "2027-02-11",
+      "t": "美國 1 月 CPI",
+      "tag": "CPI"
+    },
+    {
+      "d": "2027-03-10",
+      "t": "美國 2 月 CPI",
+      "tag": "CPI"
+    },
+    {
+      "d": "2027-03-17",
+      "t": "FOMC 利率決議",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2027-04-28",
+      "t": "FOMC 利率決議",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2027-06-09",
+      "t": "FOMC 利率決議",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2027-07-28",
+      "t": "FOMC 利率決議",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2027-09-15",
+      "t": "FOMC 利率決議",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2027-10-27",
+      "t": "FOMC 策略會議（不做利率決議）",
+      "tag": "FOMC"
+    },
+    {
+      "d": "2027-11-17",
+      "t": "FOMC 利率決議（2027 年最後一次）",
+      "tag": "FOMC"
+    }
   ]
 }
