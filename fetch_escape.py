@@ -50,6 +50,7 @@ RULES = {
     "core_cpi": {"green_below": 0.2, "red_at": 0.3},  # 10. 核心 CPI 月增率（四捨五入到 0.1，與官方公布一致）
     "capex_red": 20.0,                # 11. 四大雲端明年資本支出成長 < 20% 紅（四家平均）
     "capex_manual_stale_days": 120,   #     手動指引超過幾天沒更新就標「過期」
+    "capex_fallback": "actual",       #     明年指引還沒公布時："actual"＝用實際季資本支出年增率代替（標近似值）；"na"＝顯示無法確認、不判定
 
     # 第 3 階段惡化訊號
     "a_hy_level": 3.5, "a_hy_from_low": 1.0,
@@ -181,7 +182,8 @@ def eps_trend(tk, back_col):
 
 
 def capex_auto(tk):
-    """實際資本支出年增率（最新一季 vs 去年同季；不是指引，只當近似值）"""
+    """實際資本支出年增率（最新一季 vs 去年同季；不是指引，只當近似值）
+    回傳 (最新一季年增率, 季底日期, 前一季年增率或 None)"""
     cf = _yf().Ticker(tk).quarterly_cashflow
     label = next((i for i in cf.index if str(i).replace(" ", "").lower() == "capitalexpenditure"), None)
     if label is None:
@@ -190,7 +192,10 @@ def capex_auto(tk):
     s = s.sort_index(ascending=False)
     if len(s) < 5 or float(s.iloc[4]) == 0:
         raise ValueError("季資料不足 5 季")
-    return round((abs(float(s.iloc[0])) / abs(float(s.iloc[4])) - 1) * 100, 1), str(s.index[0])[:10]
+    def yoy(i):
+        return round((abs(float(s.iloc[i])) / abs(float(s.iloc[i + 4])) - 1) * 100, 1)
+    prev = yoy(1) if len(s) >= 6 and float(s.iloc[5]) != 0 else None
+    return yoy(0), str(s.index[0])[:10], prev
 
 
 def twse_foreign(n=25):
@@ -609,26 +614,35 @@ def main():
     cm = mom_core_cpi(f["CPILFESL"])
     x["core_cpi"] = lastv(cm)
     x["core_cpi_r"] = r1(x["core_cpi"])
-    # 11 / f：手動指引優先，沒有就用實際季增率當近似
+    # 11 / f：手動填的明年指引優先；還沒公布時依 capex_fallback 決定用實際年增率代替或不判定
     guide = (manual.get("capex_guidance") or {}).get("items") or {}
-    rates, parts, approx, stale_manual = {}, [], False, []
+    rates, parts, n_approx, stale_manual, qual = {}, [], 0, [], []
     for t in HYPERSCALERS:
         g = guide.get(t) or {}
+        if g.get("qualitative"):
+            qual.append(f"{t}：{g['qualitative']}")
         if g.get("growth_pct") is not None:
             rates[t] = float(g["growth_pct"])
-            parts.append(f"{t} {rates[t]:+.0f}%")
+            parts.append(f"{t} 指引 {rates[t]:+.0f}%")
             upd = g.get("updated")
             if upd and (TODAY - date.fromisoformat(upd)).days > R["capex_manual_stale_days"]:
                 stale_manual.append(t)
-        elif cap_auto.get(t):
-            rates[t] = cap_auto[t][0]
-            parts.append(f"{t} {rates[t]:+.0f}%*")
-            approx = True
+        elif R["capex_fallback"] == "actual" and cap_auto.get(t):
+            yoy0, qd, yoy1 = cap_auto[t]
+            rates[t] = yoy0
+            trend = "" if yoy1 is None else ("，加速" if yoy0 > yoy1 + 2 else "，放緩" if yoy0 < yoy1 - 2 else "，持平")
+            parts.append(f"{t} {yoy0:+.0f}%*（{qd[:7]} 季{trend}）")
+            n_approx += 1
     if len(rates) >= 3:
         x["capex_avg"] = round(sum(rates.values()) / len(rates), 1)
         x["capex_below_n"] = sum(1 for v in rates.values() if v < R["capex_red"])
-        x["capex_note"] = "、".join(parts) + ("（*＝最新一季實際年增率，非明年指引，近似值）" if approx else "") \
-            + (f"；手動指引過期：{', '.join(stale_manual)}" if stale_manual else "")
+        x["capex_approx"] = n_approx > 0
+        x["capex_note"] = "、".join(parts) \
+            + (f"。*明年指引尚未公布（數字通常在 1 月底～2 月初的第四季財報才給），{n_approx} 家先用最新一季實際年增率代替，近似值" if n_approx else "") \
+            + (f"；手動指引過期：{', '.join(stale_manual)}" if stale_manual else "") \
+            + (f"。質化說法：{'；'.join(qual)}" if qual else "")
+    elif qual or R["capex_fallback"] == "na":
+        x["capex_note"] = "明年指引尚未公布，不判定" + (f"。質化說法：{'；'.join(qual)}" if qual else "")
     # 輔助
     vix_v = [v for _, v in vix]
     x["vix_recent"] = vix_v[-10:]
@@ -661,7 +675,7 @@ def main():
         "mag7": ("8", "七巨頭明年 EPS 預估", None, "%（30 天變化）", "est", "轉為下修 紅", "Yahoo 分析師預估", 2),
         "tw_foreign": ("9", "外資台股買賣超", twf, "億元", "tw", "連續賣超 ≥5 日或 10 日累計 ≤ −1000 億 黃", "證交所 BFI82U", 1),
         "core_cpi": ("10", "美國核心 CPI 月增率", cm, "%", "monthly", "≥ 0.3 紅、< 0.2 綠", "FRED CPILFESL 自算", 2),
-        "capex": ("11", "四大雲端明年資本支出成長", None, "%（平均）", "est", "< 20% 紅", "手動指引 / yfinance", 1),
+        "capex": ("11", "四大雲端明年資本支出成長", None, "%（平均）", "est", "< 20% 紅；指引未公布時用實際季年增率代替", "手動指引 / yfinance 季現金流量表", 1),
     }
     single = {"tsmc": x.get("tsmc_rev_3m"), "breadth": x.get("breadth"), "mag7": x.get("mag7_rev_30d"),
               "capex": x.get("capex_avg")}
@@ -682,6 +696,7 @@ def main():
             "date": d, "status": sg["status"] if val is not None else "na",
             "rule": rule, "detail": sg.get("detail"), "source": src,
             "stale": stale_of(d, kind, ref_us, ref_tw),
+            "approx": bool(id_ == "capex" and x.get("capex_approx")),
             "spark": [[a, round(b, 3)] for a, b in s_[-SPARK_N:]] if s_ else [],
         })
     for sgl in signals:

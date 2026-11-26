@@ -286,7 +286,7 @@ async function load(){
         <span class="dot"></span>
         <span class="nm"><div class="n"><i>${esc(s.no)}</i>${esc(s.name)}</div><div class="d">${esc(s.detail || s.rule)}</div></span>
         <span class="val"><div class="v mono">${s.value===null?'無法確認':fmt(s.value)}<span class="u"> ${s.value===null?'':esc(s.unit)}</span></div>
-          <div class="dt mono ${s.stale?'stale':''}">${esc(s.date || '')}${s.stale?'<span class="stale-tag">過期</span>':''}</div></span>
+          <div class="dt mono ${s.stale?'stale':''}">${esc(s.date || '')}${s.stale?'<span class="stale-tag">過期</span>':''}${s.approx?'<span class="stale-tag" style="color:var(--amber);border-color:var(--amber)">近似</span>':''}</div></span>
       </summary>
       <div class="more">
         <p><b>規則：</b>${esc(s.rule)}</p>
