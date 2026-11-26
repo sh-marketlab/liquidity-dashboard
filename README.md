@@ -74,3 +74,16 @@ cd docs && python -m http.server 8000
 - `docs/treasury_manual.json`：黑天鵝手動狀態，在 GitHub 網頁直接改 `level`（green／yellow／red）、`note`、`updated`，存檔後重新整理網頁就生效。`exit_trigger: true` 的項目變 red，總燈號直接升紅燈。
 - 債務上限調整後：DTS 會自動抓新上限；抓不到時改 `RULES["debt_limit_fallback"]`。
 - 測試：`python -m pytest tests/test_treasury.py`
+
+## 台美股逃生檢查表（docs/escape.html，可裝成手機 App）
+
+改編自 money_crazybird 的暴跌檢查清單（韓國版），韓國項目換成台股（台積電獲利預估、外資台股買賣超、新台幣、加權指數）。每天判定：11 個燈號 → 情境（信用型／2022 型／2023 多頭型）→ 逃生 1～4 階段、回升 0～3 階段。
+
+- `fetch_escape.py` → `docs/escape_data.json`、`docs/escape_history.json`（每天累積一筆階段，之後可回測）。門檻都在檔案上方 `RULES`。
+- `notify_escape.py`：逃生或回升階段**改變時**開一則 GitHub Issue → GitHub 寄 email；手機裝 GitHub App 會直接推播。階段沒變不通知。
+- `docs/escape_manual.json`（手動，在 GitHub 網頁直接改）：
+  - `capex_guidance`：四大雲端業者「明年」資本支出成長率指引，每季財報後填 `growth_pct` 與 `updated`。沒填時用最新一季實際年增率當近似值（頁面標 *）。
+  - `events`：FOMC、CPI、就業報告日期，可自行加台積電法說會等。
+- 資料來源：FRED、美國財政部、Yahoo Finance（指數、匯率、S&P 500 成分股日線自算市場寬度）、yfinance（分析師 EPS 預估、資本支出）、證交所 BFI82U。任何來源失敗 → 該項「無法確認」，不計入紅燈。
+- **裝成手機 App**：手機瀏覽器打開 `https://sh-marketlab.github.io/liquidity-dashboard/escape.html` → iPhone Safari「分享 → 加入主畫面」；Android Chrome 點頁面上的「安裝」或選單「加到主畫面」。
+- 測試：`python -m pytest tests/test_escape.py`

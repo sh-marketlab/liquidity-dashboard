@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   update:
@@ -40,6 +41,21 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python fetch_treasury.py
 
+      - name: Escape checklist (台美股逃生檢查表)
+        continue-on-error: true
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          cp docs/escape_data.json /tmp/prev_escape.json 2>/dev/null || true
+          pip install --quiet yfinance || echo "yfinance 安裝失敗：第 6、8、11 項會顯示無法確認"
+          python fetch_escape.py
+
+      - name: Escape notify (階段改變 → GitHub Issue → email / 手機推播)
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python notify_escape.py /tmp/prev_escape.json docs/escape_data.json
+
       - name: Commit if changed
         run: |
           git config user.name "dashboard-bot"
@@ -47,5 +63,9 @@ jobs:
           git add docs/data.json docs/cycle_data.json
           git add docs/watch_data.json || true
           git add docs/treasury_data.json || true
+          git add docs/escape_data.json || true
+          git add docs/escape_history.json || true
+          git add docs/escape_tw_foreign.json || true
+          git add docs/escape_sp500.json || true
           git diff --cached --quiet || git commit -m "data update"
           git push
