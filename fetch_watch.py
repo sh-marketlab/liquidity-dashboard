@@ -138,23 +138,98 @@ def prefer_fresh(primary, backup):
     return backup, False
 
 
+# ---------------- 美國假日 (純 Python，不需額外套件) ----------------
+def _nth_weekday(y, m, wd, n):
+    """y 年 m 月第 n 個星期 wd (0=週一)；n=-1 為最後一個"""
+    if n > 0:
+        d = date(y, m, 1)
+        d += timedelta(days=(wd - d.weekday()) % 7)
+        return d + timedelta(weeks=n - 1)
+    d = date(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1)
+    return d - timedelta(days=(d.weekday() - wd) % 7)
+
+
+def _observed(d):
+    """週六的假日移到週五、週日移到週一"""
+    if d.weekday() == 5:
+        return d - timedelta(days=1)
+    if d.weekday() == 6:
+        return d + timedelta(days=1)
+    return d
+
+
+def _easter(y):
+    a, b, c = y % 19, y // 100, y % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = (h + l - 7 * m + 114) % 31 + 1
+    return date(y, month, day)
+
+
+_HOL_CACHE = {}
+
+
+def us_holidays(y):
+    """回傳 (fed, nyse) 兩組假日。
+    fed  = 聯邦假日 (Fed / FRED / 債市大致依此休市，SOFR、H.4.1 不公布)
+    nyse = 美股休市日 (無哥倫布日、退伍軍人節；多耶穌受難日)"""
+    if y in _HOL_CACHE:
+        return _HOL_CACHE[y]
+    common = {
+        _nth_weekday(y, 1, 0, 3),    # MLK
+        _nth_weekday(y, 2, 0, 3),    # Presidents
+        _nth_weekday(y, 5, 0, -1),   # Memorial
+        _observed(date(y, 6, 19)),   # Juneteenth
+        _observed(date(y, 7, 4)),    # Independence
+        _nth_weekday(y, 9, 0, 1),    # Labor
+        _nth_weekday(y, 11, 3, 4),   # Thanksgiving
+        _observed(date(y, 12, 25)),  # Christmas
+    }
+    ny = date(y, 1, 1)
+    fed = common | {
+        _observed(ny), _observed(date(y + 1, 1, 1)),  # 隔年元旦若是週六，12/31 補假
+        _nth_weekday(y, 10, 0, 2),     # Columbus
+        _observed(date(y, 11, 11)),    # Veterans
+    }
+    fed = {d for d in fed if d.year == y}
+    nyse = common | {_easter(y) - timedelta(days=2)}  # Good Friday
+    if ny.weekday() != 5:              # 元旦逢週六時，美股不在 12/31 補休
+        nyse.add(_observed(ny))
+    _HOL_CACHE[y] = (fed, nyse)
+    return fed, nyse
+
+
+def is_us_bday(d):
+    """聯邦或美股任一休市就不算工作日 (判斷資料是否過期時寧鬆勿嚴)"""
+    if d.weekday() >= 5:
+        return False
+    fed, nyse = us_holidays(d.year)
+    return d not in fed and d not in nyse
+
+
 def bdays_between(d1, d2):
-    """d1 之後到 d2 為止的工作日數 (不含 d1)"""
+    """d1 之後到 d2 為止的美國工作日數 (不含 d1；跳過週末與美國假日)"""
     a = datetime.strptime(d1, "%Y-%m-%d").date()
     n = 0
     while a < d2:
         a += timedelta(days=1)
-        if a.weekday() < 5:
+        if is_us_bday(a):
             n += 1
     return n
 
 
-def last_us_session():
-    """程式執行當下，美股最近一個已收盤的交易日 (美東 17:00 後才算當天)"""
+def last_us_session(now=None):
+    """程式執行當下，美股最近一個已收盤的交易日 (美東 17:00 後才算當天；跳過美股休市日)"""
     from zoneinfo import ZoneInfo
-    now = datetime.now(ZoneInfo("America/New_York"))
+    now = now or datetime.now(ZoneInfo("America/New_York"))
     d = now.date() if now.hour >= 17 else now.date() - timedelta(days=1)
-    while d.weekday() >= 5:
+    while d.weekday() >= 5 or d in us_holidays(d.year)[1]:
         d -= timedelta(days=1)
     return d
 
