@@ -234,6 +234,83 @@ def last_us_session(now=None):
     return d
 
 
+# ---------------- 台灣休市日 ----------------
+# 台灣假日有農曆、補假、颱風假，無法用公式算，所以：
+#   1) 先抓證交所 OpenAPI 的「開(休)市日期」(通常每年 12 月前公布隔年)
+#   2) 抓不到時用下面的內建表 (每年證交所公告後，到這裡補一行即可)
+# 「開始交易日」「最後交易日」是有交易的日子，不算休市；「市場無交易，僅辦理結算交割」算休市。
+TW_HOLIDAYS_BUILTIN = {
+    2026: ["01-01", "02-12", "02-13", "02-16", "02-17", "02-18", "02-19", "02-20",
+           "02-27", "04-03", "04-06", "05-01", "06-19", "09-25", "09-28",
+           "10-09", "10-26", "12-25"],
+}
+TWSE_HOLIDAY_API = "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule"
+_TW_HOL = None
+
+
+def _parse_tw_date(s):
+    """'1150101'(民國) / '20260101' / '2026-01-01' / '115/01/01' → date"""
+    digits = re.sub(r"\D", "", str(s))
+    try:
+        if len(digits) == 8:
+            return date(int(digits[:4]), int(digits[4:6]), int(digits[6:]))
+        if len(digits) in (6, 7):  # 民國年 2~3 位
+            return date(int(digits[:-4]) + 1911, int(digits[-4:-2]), int(digits[-2:]))
+    except ValueError:
+        pass
+    return None
+
+
+def tw_holidays():
+    """回傳台灣集中市場休市日 (set of date)；平日才有意義，週末另外判斷"""
+    global _TW_HOL
+    if _TW_HOL is not None:
+        return _TW_HOL
+    hol = {date(y, int(md[:2]), int(md[3:])) for y, mds in TW_HOLIDAYS_BUILTIN.items() for md in mds}
+    try:
+        rows = json.loads(http_get(TWSE_HOLIDAY_API, timeout=20))
+        n = 0
+        for r in rows if isinstance(rows, list) else []:
+            name = str(r.get("Name") or r.get("名稱") or "")
+            d = _parse_tw_date(r.get("Date") or r.get("日期") or "")
+            if not d or "開始交易" in name or "最後交易" in name:
+                continue
+            hol.add(d)
+            n += 1
+        print(f"[tw_holidays] 證交所休市日 {n} 筆")
+    except Exception as e:
+        print(f"[tw_holidays] 證交所休市日抓取失敗，只用內建表: {e}")
+    if TODAY.year not in TW_HOLIDAYS_BUILTIN and not any(d.year == TODAY.year for d in hol):
+        print(f"[tw_holidays] ⚠ 沒有 {TODAY.year} 年的台灣休市日，請在 TW_HOLIDAYS_BUILTIN 補上")
+    _TW_HOL = hol
+    return hol
+
+
+def is_tw_bday(d):
+    return d.weekday() < 5 and d not in tw_holidays()
+
+
+def tw_bdays_between(d1, d2):
+    """d1 之後到 d2 為止的台股交易日數 (不含 d1)"""
+    a = datetime.strptime(d1, "%Y-%m-%d").date()
+    n = 0
+    while a < d2:
+        a += timedelta(days=1)
+        if is_tw_bday(a):
+            n += 1
+    return n
+
+
+def last_tw_session(now=None):
+    """台股最近一個已收盤且盤後資料已公布的交易日 (台北 16:00 後才算當天)"""
+    from zoneinfo import ZoneInfo
+    now = now or datetime.now(ZoneInfo("Asia/Taipei"))
+    d = now.date() if now.hour >= 16 else now.date() - timedelta(days=1)
+    while not is_tw_bday(d):
+        d -= timedelta(days=1)
+    return d
+
+
 # 與「最近收盤日」相比，正常最多落後幾個工作日；超過就標「資料過期」
 # HY OAS、SOFR 來源本身就是 T+1 公布，所以日資料容許落後 1 天
 MAX_LAG_BD = {"daily": 1, "weekly": 8, "monthly": 70, "quarterly": 75, "taiwan": 1}
@@ -261,10 +338,10 @@ def _rows(obj):
 
 
 def twse_days(n_days=30):
-    """回傳最近的工作日 (由新到舊)，週末跳過"""
+    """回傳最近的台股交易日 (由新到舊)，週末與台灣休市日跳過"""
     d, out = TODAY, []
     while len(out) < n_days:
-        if d.weekday() < 5:
+        if is_tw_bday(d):
             out.append(d)
         d -= timedelta(days=1)
     return out
@@ -610,11 +687,15 @@ def main():
 
     # ---------------- 資料新鮮度 ----------------
     ref_day = last_us_session()
+    tw_ref = last_tw_session()
     for i in out:
         if not i["date"]:
             i["stale"], i["age_bd"] = False, None
             continue
-        age = bdays_between(i["date"], ref_day)
+        if i["group"] == "taiwan":
+            age = tw_bdays_between(i["date"], tw_ref)
+        else:
+            age = bdays_between(i["date"], ref_day)
         lim = SLOW_DAILY.get(i["id"], MAX_LAG_BD.get(i["group"], 2))
         i["age_bd"], i["stale"] = age, age > lim
 
