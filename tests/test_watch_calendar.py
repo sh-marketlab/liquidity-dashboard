@@ -46,3 +46,51 @@ def test_last_us_session_skips_holiday():
     assert fw.last_us_session(datetime(2026, 11, 26, 20, 0, tzinfo=ny)) == date(2026, 11, 25)
     # 週六 → 11/27
     assert fw.last_us_session(datetime(2026, 11, 28, 10, 0, tzinfo=ny)) == date(2026, 11, 27)
+
+
+# ---------------- 台灣休市日 ----------------
+def _tw_offline(monkeypatch):
+    """不連網：讓證交所 API 失敗，只用內建表"""
+    def boom(*a, **k):
+        raise OSError("offline")
+    monkeypatch.setattr(fw, "http_get", boom)
+    monkeypatch.setattr(fw, "_TW_HOL", None)
+
+
+def test_parse_tw_date():
+    assert fw._parse_tw_date("1150101") == date(2026, 1, 1)
+    assert fw._parse_tw_date("115/02/16") == date(2026, 2, 16)
+    assert fw._parse_tw_date("20261225") == date(2026, 12, 25)
+    assert fw._parse_tw_date("") is None
+
+
+def test_tw_holidays_builtin(monkeypatch):
+    _tw_offline(monkeypatch)
+    assert not fw.is_tw_bday(date(2026, 2, 12))   # 封關後無交易
+    assert not fw.is_tw_bday(date(2026, 10, 9))   # 國慶補假
+    assert fw.is_tw_bday(date(2026, 2, 11))       # 封關日有交易
+    assert fw.is_tw_bday(date(2026, 2, 23))       # 開紅盤
+    assert fw.is_tw_bday(date(2026, 11, 26))      # 美國感恩節台股照開
+
+
+def test_tw_api_rows_merged(monkeypatch):
+    import json
+    rows = [{"Name": "中華民國開國紀念日", "Date": "1160101"},
+            {"Name": "國曆新年開始交易日", "Date": "1160104"}]
+    monkeypatch.setattr(fw, "http_get", lambda *a, **k: json.dumps(rows))
+    monkeypatch.setattr(fw, "_TW_HOL", None)
+    hol = fw.tw_holidays()
+    assert date(2027, 1, 1) in hol
+    assert date(2027, 1, 4) not in hol             # 開始交易日不是休市
+    assert date(2026, 2, 16) in hol                # 內建表仍保留
+
+
+def test_tw_stale_after_lunar_new_year(monkeypatch):
+    _tw_offline(monkeypatch)
+    # 封關 2/11 的資料，到 2/22 (週日) 都不算落後
+    assert fw.tw_bdays_between("2026-02-11", date(2026, 2, 22)) == 0
+    from zoneinfo import ZoneInfo
+    tp = ZoneInfo("Asia/Taipei")
+    assert fw.last_tw_session(datetime(2026, 2, 20, 10, 0, tzinfo=tp)) == date(2026, 2, 11)
+    assert fw.last_tw_session(datetime(2026, 2, 23, 17, 0, tzinfo=tp)) == date(2026, 2, 23)
+    assert fw.last_tw_session(datetime(2026, 2, 23, 9, 0, tzinfo=tp)) == date(2026, 2, 11)
